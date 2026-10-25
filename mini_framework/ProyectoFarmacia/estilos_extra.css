@@ -1,0 +1,46 @@
+/* Estilos de los módulos nuevos. Complementa a estilos.css (no lo modifica). */
+.barra-principal { background: var(--azul); border-bottom: 4px solid var(--amarillo); }
+.barra-principal .navbar-item, .barra-principal .navbar-link, .barra-principal .navbar-burger { color: #fff; }
+.barra-principal .navbar-brand .marca { font-weight: 700; font-size: 1.15rem; letter-spacing: .3px; }
+.barra-principal a.navbar-item:hover, .barra-principal .navbar-link:hover,
+.barra-principal .navbar-item.has-dropdown:hover > .navbar-link { background: var(--azul-oscuro); color: var(--amarillo); }
+.barra-principal .navbar-link:not(.is-arrowless)::after { border-color: #fff; }
+.barra-principal .is-activo { color: var(--amarillo); box-shadow: inset 0 -3px 0 var(--amarillo); }
+.barra-principal .navbar-dropdown { background: #fff; border-top: 3px solid var(--amarillo); border-radius: 0 0 10px 10px; }
+.barra-principal .navbar-dropdown .navbar-item { color: var(--texto); }
+.barra-principal .navbar-dropdown a.navbar-item:hover { background: #fff7d5; color: var(--azul-oscuro); }
+.barra-principal .navbar-dropdown .is-activo { box-shadow: none; font-weight: 700; color: var(--azul); }
+.barra-principal .navbar-menu { background: var(--azul); }
+.usuario-barra small { opacity: .8; margin-left: .3rem; }
+
+.tarjeta-dato { background: #fff; border: 1px solid #d5dfed; border-left: 6px solid var(--amarillo); border-radius: 12px; padding: 1.1rem 1.25rem; box-shadow: 0 6px 20px rgb(18 61 121 / 6%); height: 100%; }
+.tarjeta-dato .valor { font-size: 1.7rem; font-weight: 700; color: var(--azul); line-height: 1.2; }
+.tarjeta-dato .etiqueta { color: #60718a; font-size: .85rem; text-transform: uppercase; letter-spacing: .4px; }
+.tarjeta-dato.alerta { border-left-color: #c0392b; }
+.tarjeta-dato.alerta .valor { color: #9b2424; }
+.tarjeta-modulo { display: block; background: #fff; border: 1px solid #d5dfed; border-radius: 12px; padding: 1rem 1.25rem; color: var(--texto); height: 100%; transition: .15s; }
+.tarjeta-modulo:hover { border-color: var(--azul); background: #fff7d5; color: var(--azul-oscuro); transform: translateY(-2px); }
+.tarjeta-modulo strong { display: block; color: var(--azul); }
+.tarjeta-modulo small { color: #60718a; }
+
+.box { border: 1px solid #d5dfed; border-radius: 12px; box-shadow: 0 6px 20px rgb(18 61 121 / 6%); }
+.tag.is-vigente { background: #e3f6e8; color: #1c6b34; }
+.tag.is-porvencer { background: #fff3c4; color: #7a5a00; }
+.tag.is-vencido, .tag.is-anulada { background: #ffe0e0; color: #9b2424; }
+.tag.is-neutro { background: #e8eef7; color: var(--azul); }
+.barra-valor { height: 10px; background: var(--amarillo); border-radius: 5px; min-width: 2px; }
+.col-num { text-align: right !important; white-space: nowrap; }
+.filtros-lista { background: #fff; border: 1px solid #d5dfed; border-radius: 12px; padding: 1rem; margin-bottom: 1rem; }
+
+.login-caja { max-width: 430px; margin: 8vh auto 0; }
+.login-caja .box { border-top: 6px solid var(--amarillo); }
+
+.ticket { background: #fff; max-width: 820px; margin: 0 auto; padding: 2rem; border: 1px solid #d5dfed; border-radius: 12px; position: relative; }
+.ticket .sello-anulada { position: absolute; top: 40%; left: 50%; transform: translate(-50%,-50%) rotate(-18deg); font-size: 4rem; font-weight: 800; color: rgb(155 36 36 / 18%); border: 8px solid rgb(155 36 36 / 18%); padding: 0 1.5rem; border-radius: 12px; pointer-events: none; }
+
+@media print {
+    .no-imprimir, .navbar, .aviso-temporal { display: none !important; }
+    body { background: #fff; }
+    .section { padding: 0; }
+    .ticket { border: 0; box-shadow: none; padding: 0; }
+}

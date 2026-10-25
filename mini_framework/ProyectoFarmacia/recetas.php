@@ -1,0 +1,35 @@
+<?php
+require_once __DIR__ . '/crud_motor.php';
+crud_ejecutar([
+    'titulo' => 'Recetas médicas', 'subtitulo' => 'Recetas de los clientes para medicamentos controlados',
+    'singular' => 'receta', 'boton_nuevo' => '+ Nueva receta', 'etiqueta' => 'recetas',
+    'tabla' => 'receta', 'pk' => 'id_receta', 'menu' => 'recetas', 'roles' => ROLES, 'roles_eliminar' => ROLES_GESTION,
+    'from' => 'FROM dbo.receta t INNER JOIN dbo.cliente cl ON cl.id_cliente=t.id_cliente INNER JOIN dbo.medicamento m ON m.id_medicamento=t.id_medicamento',
+    'select' => 't.*, ' . sql_nombre_cliente('cl') . ' AS cliente, m.nombre AS medicamento',
+    'buscar' => ['cl.primer_nombre', 'cl.primer_apellido', 'cl.identificacion', 'm.nombre', 'CAST(t.numero_receta AS VARCHAR(20))', 't.diagnostico'],
+    'orden' => 't.fecha_emision DESC, t.id_receta DESC', 'placeholder' => 'Buscar por N.º de receta, cliente, identificación o medicamento…',
+    'campos' => [
+        ['n' => 'id_cliente', 'l' => 'Cliente', 't' => 'select', 'req' => true, 'col' => 6,
+            'sql' => "SELECT id_cliente AS v, CONCAT(identificacion,' - ',primer_nombre,' ',primer_apellido) AS t FROM dbo.cliente ORDER BY primer_nombre, primer_apellido"],
+        ['n' => 'id_medicamento', 'l' => 'Medicamento', 't' => 'select', 'req' => true, 'col' => 6,
+            'sql' => "SELECT id_medicamento AS v, CONCAT(nombre,' ',ISNULL(concentracion,''),CASE WHEN requiere_receta=1 THEN ' (Rx)' ELSE '' END) AS t FROM dbo.medicamento ORDER BY nombre"],
+        ['n' => 'numero_receta', 'l' => 'N.º de receta', 't' => 'number', 'req' => true, 'unico' => true, 'col' => 4],
+        ['n' => 'fecha_emision', 'l' => 'Fecha de emisión', 't' => 'date', 'req' => true, 'def' => 'hoy', 'col' => 4],
+        ['n' => 'fecha_vencimiento', 'l' => 'Vence', 't' => 'date', 'req' => true, 'col' => 4],
+        ['n' => 'dosis', 'l' => 'Dosis', 'max' => 50, 'col' => 6, 'ph' => 'Ej. 1 tableta cada 8 horas'],
+        ['n' => 'duracion', 'l' => 'Duración', 'max' => 20, 'col' => 6, 'ph' => 'Ej. 7 días'],
+        ['n' => 'diagnostico', 'l' => 'Diagnóstico', 'max' => 100],
+        ['n' => 'indicaciones', 'l' => 'Indicaciones', 'max' => 100],
+        ['n' => 'observaciones', 'l' => 'Observaciones', 'max' => 100],
+    ],
+    'validar' => fn($v, $id) => $v['fecha_vencimiento'] < $v['fecha_emision'] ? 'La fecha de vencimiento no puede ser anterior a la de emisión.' : null,
+    'lista' => [
+        ['N.º', 'numero_receta', 'f' => fn($r) => '<strong>' . (int)$r['numero_receta'] . '</strong>'],
+        ['Cliente', 'cliente'],
+        ['Medicamento', 'medicamento'],
+        ['Dosis', 'dosis'],
+        ['Emitida', 'fecha_emision', 'f' => fn($r) => fecha_fmt($r['fecha_emision'])],
+        ['Vence', 'fecha_vencimiento', 'f' => fn($r) => fecha_fmt($r['fecha_vencimiento']) . ' ' . (substr($r['fecha_vencimiento'], 0, 10) >= date('Y-m-d') ? '<span class="tag is-vigente">Vigente</span>' : '<span class="tag is-vencido">Vencida</span>')],
+    ],
+    'msg_fk' => 'No se puede eliminar: la receta fue usada en una venta.',
+]);
