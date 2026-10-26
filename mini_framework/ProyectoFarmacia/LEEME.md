@@ -7,9 +7,13 @@ Se agregaron los módulos que faltaban para usar las **15 tablas** de la base de
 
 ## Instalación
 1. Copie todos los archivos de esta carpeta dentro de la carpeta de su proyecto (junto a `index.php`).
-2. Abra `http://localhost/…/login.php`. Como aún no hay usuarios, el sistema le pide **crear el administrador**
+2. Cree su archivo local de configuración copiando `.env.example` como `.env` en esta carpeta. Ajuste `DB_SERVER` y `DB_NAME` a su SQL Server. Con autenticación integrada de Windows, deje `DB_USERNAME` y `DB_PASSWORD` vacíos; si usa un usuario SQL, complete ambos.
+   En PowerShell: `Copy-Item .env.example .env`.
+3. Abra `http://localhost/…/login.php`. Como aún no hay usuarios, el sistema le pide **crear el administrador**
    (también crea un cliente «Cliente General» para ventas de mostrador).
-3. Listo: desde `inicio.php` se llega a todo el sistema.
+4. Listo: desde `inicio.php` se llega a todo el sistema.
+
+El archivo `.env` contiene configuración privada: no lo suba a GitHub ni lo envíe por chat. El repositorio solo incluye `.env.example`; cada colaborador debe crear su propio `.env`. Para despliegues automatizados, configure `DB_SERVER`, `DB_NAME`, `DB_USERNAME` y `DB_PASSWORD` como variables/secretos del entorno de ejecución; las variables de entorno tienen prioridad sobre `.env`.
 
 ## Qué tabla se administra en cada pantalla
 | Tabla(s) | Pantalla | Qué hace |

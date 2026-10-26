@@ -1,8 +1,10 @@
 :root {
-    --azul: #123d79;
-    --azul-oscuro: #0b2852;
-    --amarillo: #ffd43b;
-    --texto: #20324c;
+    --azul: #0c4a6e;
+    --azul-oscuro: #082f49;
+    --celeste: #bae6fd;
+    --celeste-claro: #e0f2fe;
+    --amarillo: #38bdf8;
+    --texto: #172b3a;
 }
 
 .paginacion-productos { margin-top: 1rem; }
@@ -68,14 +70,14 @@ dialog.modal::backdrop { background: transparent; }
 
 body {
     min-height: 100vh;
-    background: #eef3fa;
+    background: #f0f9ff;
     color: var(--texto);
 }
 
 .section { padding: 2.5rem 1.25rem; }
 
 .encabezado-productos {
-    background: var(--azul);
+    background: var(--celeste);
     border-bottom: 5px solid var(--amarillo);
     border-radius: 16px;
     padding: 1.75rem 2rem;
@@ -83,7 +85,8 @@ body {
     margin-bottom: 1.75rem;
 }
 
-.encabezado-productos .title { color: #fff; }
+.encabezado-productos .title { color: var(--azul-oscuro); }
+.encabezado-productos .subtitle { color: var(--azul); }
 
 .button {
     border-radius: 8px;
@@ -104,25 +107,25 @@ body {
 }
 
 .button.is-primary {
-    background: var(--amarillo);
-    border-color: var(--amarillo);
-    color: var(--azul-oscuro);
-}
-
-.button.is-primary:hover,
-.button.is-primary:active {
-    background: #f2c21a;
-    border-color: #f2c21a;
-    color: var(--azul-oscuro);
-}
-
-.button.is-info {
     background: var(--azul);
     border-color: var(--azul);
     color: #fff;
 }
 
-.button.is-info:hover { background: var(--azul-oscuro); color: #fff; }
+.button.is-primary:hover,
+.button.is-primary:active {
+    background: var(--azul-oscuro);
+    border-color: var(--azul-oscuro);
+    color: #fff;
+}
+
+.button.is-info {
+    background: var(--celeste);
+    border-color: #7dd3fc;
+    color: var(--azul-oscuro);
+}
+
+.button.is-info:hover { background: #7dd3fc; color: var(--azul-oscuro); }
 
 .button.is-danger {
     background: #fff0f0;
@@ -160,25 +163,27 @@ body {
 
 .table { margin-bottom: 0; color: var(--texto); }
 .table thead th {
-    background: var(--azul);
-    color: #fff;
-    border-bottom: 3px solid var(--amarillo);
+    background: var(--celeste);
+    color: var(--azul-oscuro);
+    border-bottom: 3px solid #38bdf8;
     padding: 1rem;
 }
 .table td { padding: .85rem 1rem; vertical-align: middle; border-color: #e5ebf4; }
-.table.is-striped tbody tr:not(.is-selected):nth-child(even) { background: #f3f6fb; }
-.table.is-hoverable tbody tr:not(.is-selected):hover { background: #fff7d5; }
+.table.is-striped tbody tr:not(.is-selected):nth-child(even) > * { background: #e0f2fe !important; color: #172b3a !important; }
+.table tbody tr:not(.is-selected):nth-child(odd) > * { background: #fff !important; color: #172b3a !important; }
+.table.is-hoverable tbody tr:not(.is-selected):hover > * { background: #bae6fd !important; color: #082f49 !important; }
+.table tbody td strong { color: var(--azul-oscuro) !important; }
 .table td:last-child { white-space: nowrap; }
 
 .modal-background { background: rgb(7 25 51 / 70%); }
 .modal-card { border-radius: 14px; }
 .modal-card-head {
-    background: var(--azul);
-    border-bottom: 4px solid var(--amarillo);
+    background: var(--celeste);
+    border-bottom: 4px solid #38bdf8;
 }
-.modal-card-title { color: #fff; font-weight: 600; }
+.modal-card-title { color: var(--azul-oscuro); font-weight: 600; }
 .modal-card-body { background: #fff; }
-.modal-card-foot { background: #eef3fa; border-top: 1px solid #d5dfed; }
+.modal-card-foot { background: #e0f2fe; border-top: 1px solid #7dd3fc; }
 .label { color: var(--azul-oscuro); }
 .select:not(.is-multiple):not(.is-loading)::after { border-color: var(--azul); }
 .modal-card > form { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }

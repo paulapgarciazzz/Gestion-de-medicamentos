@@ -1,5 +1,4 @@
-
-# Variables de entorno privadas
+﻿# Variables de entorno privadas
 .env
 .env.*
 !.env.example
