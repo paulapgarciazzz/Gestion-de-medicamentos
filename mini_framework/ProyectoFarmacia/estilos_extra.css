@@ -1,16 +1,16 @@
 /* Estilos de los módulos nuevos. Complementa a estilos.css (no lo modifica). */
-.barra-principal { background: var(--azul); border-bottom: 4px solid var(--amarillo); }
-.barra-principal .navbar-item, .barra-principal .navbar-link, .barra-principal .navbar-burger { color: #fff; }
+.barra-principal { background: var(--celeste); border-bottom: 4px solid var(--amarillo); }
+.barra-principal .navbar-item, .barra-principal .navbar-link, .barra-principal .navbar-burger { color: var(--azul-oscuro); }
 .barra-principal .navbar-brand .marca { font-weight: 700; font-size: 1.15rem; letter-spacing: .3px; }
 .barra-principal a.navbar-item:hover, .barra-principal .navbar-link:hover,
-.barra-principal .navbar-item.has-dropdown:hover > .navbar-link { background: var(--azul-oscuro); color: var(--amarillo); }
-.barra-principal .navbar-link:not(.is-arrowless)::after { border-color: #fff; }
-.barra-principal .is-activo { color: var(--amarillo); box-shadow: inset 0 -3px 0 var(--amarillo); }
+.barra-principal .navbar-item.has-dropdown:hover > .navbar-link { background: #7dd3fc; color: var(--azul-oscuro); }
+.barra-principal .navbar-link:not(.is-arrowless)::after { border-color: var(--azul-oscuro); }
+.barra-principal .is-activo { color: var(--azul-oscuro); box-shadow: inset 0 -3px 0 #0284c7; }
 .barra-principal .navbar-dropdown { background: #fff; border-top: 3px solid var(--amarillo); border-radius: 0 0 10px 10px; }
 .barra-principal .navbar-dropdown .navbar-item { color: var(--texto); }
-.barra-principal .navbar-dropdown a.navbar-item:hover { background: #fff7d5; color: var(--azul-oscuro); }
+.barra-principal .navbar-dropdown a.navbar-item:hover { background: var(--celeste-claro); color: var(--azul-oscuro); }
 .barra-principal .navbar-dropdown .is-activo { box-shadow: none; font-weight: 700; color: var(--azul); }
-.barra-principal .navbar-menu { background: var(--azul); }
+.barra-principal .navbar-menu { background: var(--celeste); }
 .usuario-barra small { opacity: .8; margin-left: .3rem; }
 
 .tarjeta-dato { background: #fff; border: 1px solid #d5dfed; border-left: 6px solid var(--amarillo); border-radius: 12px; padding: 1.1rem 1.25rem; box-shadow: 0 6px 20px rgb(18 61 121 / 6%); height: 100%; }
@@ -19,7 +19,7 @@
 .tarjeta-dato.alerta { border-left-color: #c0392b; }
 .tarjeta-dato.alerta .valor { color: #9b2424; }
 .tarjeta-modulo { display: block; background: #fff; border: 1px solid #d5dfed; border-radius: 12px; padding: 1rem 1.25rem; color: var(--texto); height: 100%; transition: .15s; }
-.tarjeta-modulo:hover { border-color: var(--azul); background: #fff7d5; color: var(--azul-oscuro); transform: translateY(-2px); }
+.tarjeta-modulo:hover { border-color: #38bdf8; background: var(--celeste-claro); color: var(--azul-oscuro); transform: translateY(-2px); }
 .tarjeta-modulo strong { display: block; color: var(--azul); }
 .tarjeta-modulo small { color: #60718a; }
 
