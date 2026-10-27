@@ -1,4 +1,20 @@
 <?php require_once 'conexion.php'; ?>
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Farmacia | Medicamentos</title><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css"><link rel="stylesheet" href="estilos.css"><script src="htmx.min.js"></script></head><body>
 <section class="section"><div class="container"><div class="level encabezado-productos"><div class="level-left"><div><h1 class="title">Inventario de medicamentos</h1><p class="subtitle">Farmacia · farmacia</p></div></div><div class="level-right"><button class="button is-primary" hx-get="producto_form.php" hx-target="#modal-contenido" hx-swap="innerHTML">+ Nuevo medicamento</button></div></div>
-<div class="field"><div class="control"><input class="input" type="search" name="buscar" placeholder="Buscar por nombre, código de barras o categoría…" hx-get="productos_lista.php" hx-trigger="keyup changed delay:400ms, search" hx-target="#lista-productos" hx-include="this"></div></div><div id="mensaje-lista" role="alert"></div><div id="lista-productos" hx-get="productos_lista.php" hx-trigger="load, medicamentoGuardado from:body, medicamentoEliminado from:body" hx-include="[name=buscar], #pagina-productos" hx-swap="innerHTML"></div></div></section><div id="modal-contenido"></div><div id="aviso-temporal" class="notification aviso-temporal" role="status" hidden><button type="button" class="delete" aria-label="Cerrar"></button><span id="texto-aviso"></span></div><script src="avisos.js"></script><script>document.body.addEventListener('cerrarModal',()=>document.getElementById('modal-contenido').innerHTML='');document.body.addEventListener('medicamentoGuardado',()=>{document.getElementById('modal-contenido').innerHTML='';document.getElementById('mensaje-lista').innerHTML=''});document.body.addEventListener('htmx:beforeSwap',e=>{if([404,409,422,500].includes(e.detail.xhr.status)){e.detail.shouldSwap=true;e.detail.isError=false}});</script></body></html>
+<div class="field"><div class="control"><input class="input" type="search" name="buscar" placeholder="Buscar por nombre, código de barras o categoría…" hx-get="productos_lista.php" hx-trigger="keyup changed delay:400ms, search" hx-target="#lista-productos" hx-include="this"></div></div><div id="mensaje-lista" role="alert"></div><div id="lista-productos" hx-get="productos_lista.php" hx-trigger="load, medicamentoGuardado from:body, medicamentoEliminado from:body" hx-include="[name=buscar], #pagina-productos" hx-swap="innerHTML"></div></div></section><div id="modal-contenido"></div>
+
+<dialog id="confirmar-eliminacion" class="modal">
+  <div class="modal-background"></div>
+  <div class="modal-card">
+    <section class="modal-card-body">
+      <p class="title is-5">Confirmar acción</p>
+      <p id="texto-confirmacion"></p>
+    </section>
+    <footer class="modal-card-foot">
+      <button type="button" class="button" data-cancelar>Cancelar</button>
+      <button type="button" id="aceptar-eliminacion" class="button is-danger">Aceptar</button>
+    </footer>
+  </div>
+</dialog>
+
+<div id="aviso-temporal" class="notification aviso-temporal" role="status" hidden><button type="button" class="delete" aria-label="Cerrar"></button><span id="texto-aviso"></span></div><script src="avisos.js"></script><script>document.body.addEventListener('cerrarModal',()=>document.getElementById('modal-contenido').innerHTML='');document.body.addEventListener('medicamentoGuardado',()=>{document.getElementById('modal-contenido').innerHTML='';document.getElementById('mensaje-lista').innerHTML=''});document.body.addEventListener('htmx:beforeSwap',e=>{if([404,409,422,500].includes(e.detail.xhr.status)){e.detail.shouldSwap=true;e.detail.isError=false}});</script></body></html>
