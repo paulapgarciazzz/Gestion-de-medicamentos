@@ -41,8 +41,15 @@ try {
     $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 
     $conexion = $pdo;
+
 } catch (PDOException $e) {
     error_log("Error de conexión SQL Server: " . $e->getMessage());
+
     http_response_code(500);
-    exit("No se pudo conectar a SQL Server. Compruebe que exista la base de datos '$baseDatos' en la instancia '$servidor' y que PHP tenga habilitado PDO_SQLSRV.");
+
+    exit(
+        "Error real de conexión SQL Server: "
+        . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8')
+    );
 }
+
