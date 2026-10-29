@@ -21,7 +21,7 @@ if ($accion === 'lista') {
     $cond = []; $params = [];
     if ($buscar !== '') { $cond[] = '(m.nombre LIKE ? OR dl.numero_lote LIKE ?)'; $params = ['%' . $buscar . '%', '%' . $buscar . '%']; }
     switch ($filtro) {
-        case 'vigentes':   $cond[] = "dl.estado='Activo' AND dl.fecha_vencimiento>=$hoy AND st.disponible>0"; break;
+        case 'vigentes':   $cond[] = sql_lote_estado_vendible('dl') . " AND dl.fecha_vencimiento>=$hoy AND st.disponible>0"; break;
         case 'por_vencer': $cond[] = "dl.fecha_vencimiento>=$hoy AND dl.fecha_vencimiento<=DATEADD(DAY,90,$hoy) AND st.disponible>0"; break;
         case 'vencidos':   $cond[] = "dl.fecha_vencimiento<$hoy AND st.disponible>0"; break;
         case 'agotados':   $cond[] = 'st.disponible<=0'; break;
@@ -38,7 +38,7 @@ if ($accion === 'lista') {
         <td><?= fecha_fmt($r['fecha_fabricacion']) ?></td><td><?= fecha_fmt($r['fecha_vencimiento']) ?><br><?= badge_vencimiento($r['fecha_vencimiento'], $disp) ?></td>
         <td class="col-num"><?= (int)$r['cantidad_inicial'] ?></td><td class="col-num"><?= (int)$r['cantidad_inicial'] - $disp ?></td>
         <td class="col-num"><strong><?= $disp ?></strong><?= $disp <= 0 ? ' <span class="tag is-neutro">Agotado</span>' : '' ?></td>
-        <td><span class="tag <?= $r['estado'] === 'Activo' ? 'is-vigente' : 'is-vencido' ?>"><?= h($r['estado']) ?></span></td>
+        <td><span class="tag <?= lote_estado_vendible($r['estado']) ? 'is-vigente' : 'is-vencido' ?>"><?= h($r['estado']) ?></span></td>
         <td><button class="button is-info is-small" hx-get="lotes.php?accion=form&id=<?= (int)$r['id_detalle_lote'] ?>" hx-target="#modal-contenido">Estado</button></td></tr>
     <?php endforeach; ?></tbody></table></div>
     <?= html_paginacion('lotes.php?accion=lista', $pagina, $paginas, $total, $offset, 10, 'lotes', '#filtros') ?>
@@ -48,12 +48,21 @@ if ($accion === 'lista') {
 
 if ($accion === 'form') {
     $id = (int)($_GET['id'] ?? 0);
-    $d = fila('SELECT dl.id_detalle_lote, dl.numero_lote, dl.estado, dl.fecha_vencimiento, m.nombre FROM dbo.detalle_lote dl INNER JOIN dbo.medicamento m ON m.id_medicamento=dl.id_medicamento WHERE dl.id_detalle_lote=?', [$id]);
+    $d = fila('SELECT dl.id_detalle_lote, dl.id_lote, dl.numero_lote, dl.estado, dl.fecha_fabricacion, dl.fecha_vencimiento,
+            dl.cantidad_inicial, st.disponible, m.nombre, m.concentracion
+        FROM dbo.detalle_lote dl INNER JOIN dbo.medicamento m ON m.id_medicamento=dl.id_medicamento ' . sql_stock_apply('dl') . '
+        WHERE dl.id_detalle_lote=?', [$id]);
     if (!$d) { http_response_code(404); exit('<div class="notification is-warning">El lote no existe.</div>'); }
     modal_inicio('Estado del lote ' . $d['numero_lote'], 'lotes.php?accion=guardar', '560px');
-    echo '<input type="hidden" name="id" value="' . $id . '"><p class="mb-3"><strong>' . h($d['nombre']) . '</strong> · vence ' . fecha_fmt($d['fecha_vencimiento']) . '</p>'
+    $vendido = (int)$d['cantidad_inicial'] - (int)$d['disponible'];
+    $estadoActual = lote_estado_vendible($d['estado']) ? 'Activo' : $d['estado'];
+    echo '<input type="hidden" name="id" value="' . $id . '"><div class="content"><p><strong>' . h($d['nombre']) . '</strong> <small>' . h($d['concentracion']) . '</small></p>'
+        . '<p><strong>ID de lote:</strong> ' . (int)$d['id_lote'] . '<br><strong>Número:</strong> ' . h($d['numero_lote'])
+        . '<br><strong>Fabricación:</strong> ' . fecha_fmt($d['fecha_fabricacion']) . '<br><strong>Vencimiento:</strong> ' . fecha_fmt($d['fecha_vencimiento'])
+        . '<br><strong>Cantidad inicial:</strong> ' . (int)$d['cantidad_inicial'] . '<br><strong>Vendido:</strong> ' . $vendido
+        . '<br><strong>Disponible:</strong> ' . (int)$d['disponible'] . '</p></div>'
         . '<div class="field"><label class="label">Estado del lote</label><div class="select is-fullwidth"><select name="estado">';
-    foreach (ESTADOS_LOTE as $k => $t) echo '<option value="' . $k . '" ' . ($d['estado'] === $k ? 'selected' : '') . '>' . h($t) . '</option>';
+    foreach (ESTADOS_LOTE as $k => $t) echo '<option value="' . $k . '" ' . ($estadoActual === $k ? 'selected' : '') . '>' . h($t) . '</option>';
     echo '</select></div></div><p class="help">Un lote que no está «Activo» o que ya venció no aparece en el punto de venta.</p>';
     modal_fin('Guardar estado');
     exit;

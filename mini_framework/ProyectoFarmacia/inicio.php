@@ -9,11 +9,11 @@ $nMed = (int)escalar('SELECT COUNT(*) FROM dbo.medicamento');
 $nCli = (int)escalar('SELECT COUNT(*) FROM dbo.cliente');
 $gestion = tiene_rol(ROLES_GESTION);
 if ($gestion) {
-    $porVencer = (int)escalar("SELECT COUNT(*) FROM dbo.detalle_lote dl " . sql_stock_apply('dl') . " WHERE dl.estado='Activo' AND dl.fecha_vencimiento>=$hoy AND dl.fecha_vencimiento<=DATEADD(DAY,90,$hoy) AND st.disponible>0");
+    $porVencer = (int)escalar("SELECT COUNT(*) FROM dbo.detalle_lote dl " . sql_stock_apply('dl') . " WHERE " . sql_lote_estado_vendible('dl') . " AND dl.fecha_vencimiento>=$hoy AND dl.fecha_vencimiento<=DATEADD(DAY,90,$hoy) AND st.disponible>0");
     $vencidos = (int)escalar("SELECT COUNT(*) FROM dbo.detalle_lote dl " . sql_stock_apply('dl') . " WHERE dl.estado='Activo' AND dl.fecha_vencimiento<$hoy AND st.disponible>0");
     $bajo = (int)escalar('SELECT COUNT(*) FROM (' . sql_inventario() . ') x WHERE x.stock<=10');
     $proximos = filas("SELECT TOP 6 m.nombre, dl.numero_lote, dl.fecha_vencimiento, st.disponible FROM dbo.detalle_lote dl INNER JOIN dbo.medicamento m ON m.id_medicamento=dl.id_medicamento " . sql_stock_apply('dl')
-        . " WHERE dl.estado='Activo' AND dl.fecha_vencimiento>=$hoy AND dl.fecha_vencimiento<=DATEADD(DAY,90,$hoy) AND st.disponible>0 ORDER BY dl.fecha_vencimiento");
+        . " WHERE " . sql_lote_estado_vendible('dl') . " AND dl.fecha_vencimiento>=$hoy AND dl.fecha_vencimiento<=DATEADD(DAY,90,$hoy) AND st.disponible>0 ORDER BY dl.fecha_vencimiento");
 }
 $ultimas = filas('SELECT TOP 6 v.id_venta, v.fecha_venta, v.total, v.estado, ' . sql_nombre_cliente('c') . ' AS cliente FROM dbo.venta v INNER JOIN dbo.cliente c ON c.id_cliente=v.id_cliente ORDER BY v.fecha_venta DESC, v.id_venta DESC');
 

@@ -694,3 +694,22 @@ dialog.modal::backdrop {
         animation-iteration-count: 1 !important;
     }
 }
+
+html body *,
+html body *::before,
+html body *::after {
+    color: #000000 !important;
+}
+
+html body input::placeholder,
+html body textarea::placeholder {
+    color: #000000 !important;
+    opacity: 1 !important;
+}
+
+html body button:disabled,
+html body input:disabled,
+html body select:disabled,
+html body textarea:disabled {
+    opacity: 1 !important;
+}

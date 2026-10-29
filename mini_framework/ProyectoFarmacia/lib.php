@@ -148,6 +148,12 @@ function sql_stock_apply($alias = 'dl') {
             FROM dbo.detalle_venta dv INNER JOIN dbo.venta v ON v.id_venta=dv.id_venta
             WHERE dv.id_detalle_lote={$alias}.id_detalle_lote AND v.estado<>'Anulada') st";
 }
+function sql_lote_estado_vendible($alias = 'dl') {
+    return "UPPER(LTRIM(RTRIM({$alias}.estado))) IN ('ACTIVO','DISPONIBLE','POR VENCER')";
+}
+function lote_estado_vendible($estado) {
+    return in_array(strtoupper(trim((string)$estado)), ['ACTIVO', 'DISPONIBLE', 'POR VENCER'], true);
+}
 function stock_lote($idDetalleLote) {
     return (int)escalar('SELECT dl.cantidad_inicial - ISNULL((SELECT SUM(dv.cantidad) FROM dbo.detalle_venta dv
         INNER JOIN dbo.venta v ON v.id_venta=dv.id_venta WHERE dv.id_detalle_lote=dl.id_detalle_lote AND v.estado<>\'Anulada\'),0)
@@ -156,9 +162,9 @@ function stock_lote($idDetalleLote) {
 function sql_inventario() {
     $hoy = 'CAST(GETDATE() AS DATE)';
     return "SELECT m.id_medicamento, m.nombre, m.concentracion, c.nombre AS categoria, m.precio_costo, m.precio_venta,
-        ISNULL(SUM(CASE WHEN dl.estado='Activo' AND dl.fecha_vencimiento>=$hoy THEN st.disponible END),0) AS stock,
+        ISNULL(SUM(CASE WHEN " . sql_lote_estado_vendible('dl') . " AND dl.fecha_vencimiento>=$hoy THEN st.disponible END),0) AS stock,
         ISNULL(SUM(CASE WHEN dl.fecha_vencimiento<$hoy AND dl.estado<>'Retirado' THEN st.disponible END),0) AS vencido,
-        MIN(CASE WHEN dl.estado='Activo' AND dl.fecha_vencimiento>=$hoy AND st.disponible>0 THEN dl.fecha_vencimiento END) AS prox_venc
+        MIN(CASE WHEN " . sql_lote_estado_vendible('dl') . " AND dl.fecha_vencimiento>=$hoy AND st.disponible>0 THEN dl.fecha_vencimiento END) AS prox_venc
         FROM dbo.medicamento m
         INNER JOIN dbo.categoria c ON c.id_categoria=m.id_categoria
         LEFT JOIN dbo.detalle_lote dl ON dl.id_medicamento=m.id_medicamento
@@ -202,7 +208,7 @@ function pagina_inicio($titulo, $activo = '') {
     echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
         . '<title>Farmacia | ' . h($titulo) . '</title>'
         . '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css">'
-        . '<link rel="stylesheet" href="estilos.css"><link rel="stylesheet" href="estilos_extra.css">'
+        . '<link rel="stylesheet" href="estilos.css?v=20261028-2207"><link rel="stylesheet" href="estilos_extra.css?v=20261028-2207">'
         . '<script src="htmx.min.js"></script></head><body>';
     include __DIR__ . '/menu.php';
     echo '<section class="section"><div class="container">';

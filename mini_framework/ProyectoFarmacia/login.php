@@ -52,7 +52,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Farmacia | Ingreso</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css">
-<link rel="stylesheet" href="estilos.css"><link rel="stylesheet" href="estilos_extra.css"></head><body>
+<link rel="stylesheet" href="estilos.css?v=20261028-2207"><link rel="stylesheet" href="estilos_extra.css?v=20261028-2207"></head><body>
 <div class="login-caja"><div class="box">
   <h1 class="title is-4"><?= $hayUsuarios ? 'Ingreso al sistema' : 'Configuración inicial' ?></h1>
   <?php if (!$hayUsuarios): ?><p class="mb-4">No hay usuarios registrados. Cree el <strong>administrador</strong> del sistema.</p><?php endif; ?>
