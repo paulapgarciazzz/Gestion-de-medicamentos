@@ -163,9 +163,11 @@ function compra_guardar() {
         $s->execute([$idProv, usuario_actual()['id'], $fecha . ' ' . date('H:i:s'), $factura, round($sub + $imp, 2), $imp]);
         $idCompra = (int)$s->fetchColumn();
         foreach ($lineas as [$idMed, $lote, $fab, $venc, $cant, $costo, $bruto, $totalLinea]) {
-            $ex = fila('SELECT id_detalle_lote, id_lote, fecha_vencimiento FROM dbo.detalle_lote WITH (UPDLOCK) WHERE id_medicamento=? AND numero_lote=?', [$idMed, $lote]);
+            $ex = fila('SELECT id_detalle_lote, id_lote, fecha_fabricacion, fecha_vencimiento FROM dbo.detalle_lote WITH (UPDLOCK) WHERE id_medicamento=? AND numero_lote=?', [$idMed, $lote]);
             if ($ex) {
-                if (substr((string)$ex['fecha_vencimiento'], 0, 10) !== $venc) throw new ErrorNegocio("El lote «$lote» ya existe para ese medicamento con otra fecha de vencimiento. Use otro número de lote o la misma fecha.");
+                if (substr((string)$ex['fecha_fabricacion'], 0, 10) !== $fab || substr((string)$ex['fecha_vencimiento'], 0, 10) !== $venc) {
+                    throw new ErrorNegocio("El lote «$lote» ya existe para ese medicamento con fechas de fabricación o vencimiento diferentes. Verifique las fechas antes de registrar la compra.");
+                }
                 $pdo->prepare('UPDATE dbo.detalle_lote SET cantidad_inicial=cantidad_inicial+? WHERE id_detalle_lote=?')->execute([$cant, $ex['id_detalle_lote']]);
                 $pdo->prepare('UPDATE dbo.lote SET cantidad_inicial=cantidad_inicial+? WHERE id_lote=?')->execute([$cant, $ex['id_lote']]);
                 $idDL = (int)$ex['id_detalle_lote'];
