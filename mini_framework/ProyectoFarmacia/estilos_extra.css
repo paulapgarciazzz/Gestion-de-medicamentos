@@ -53,10 +53,22 @@
 .col-num { text-align: right !important; white-space: nowrap; }
 .filtros-lista { background: #fff; border: 1px solid #d5dfed; border-radius: 12px; padding: 1rem; margin-bottom: 1rem; }
 
+/* Resultados de la búsqueda de cliente (Nueva venta) y de proveedor (Nueva compra). */
+.resultados-busqueda { margin-top: .5rem; max-height: 260px; overflow-y: auto; border: 1px solid #d5dfed; border-radius: 8px; background: #fff; }
+.opcion-busqueda { display: block; width: 100%; padding: .5rem .75rem; border: 0; border-bottom: 1px solid #e5ebf3; background: #fff; color: #334155; text-align: left; font: inherit; cursor: pointer; }
+.opcion-busqueda:last-child { border-bottom: 0; }
+.opcion-busqueda:hover, .opcion-busqueda:focus-visible { background: #f0fdf4; color: #14532d; outline: none; }
+.opcion-busqueda strong { display: block; color: inherit; }
+.opcion-busqueda small { color: #60718a; }
+.resultados-busqueda[hidden], .opcion-busqueda[hidden] { display: none; }
+
 .login-caja { max-width: 430px; margin: 8vh auto 0; }
 .login-caja .box { border-top: 6px solid var(--amarillo); }
 
 .ticket { background: #fff; max-width: 820px; margin: 0 auto; padding: 2rem; border: 1px solid #d5dfed; border-radius: 12px; position: relative; }
+/* La factura de compra tiene 8 columnas: celdas más compactas para que la tabla quepa dentro del ticket. */
+.ticket .table thead th { padding: .75rem .5rem; }
+.ticket .table td { padding: .6rem .5rem; font-size: .9rem; }
 .ticket .sello-anulada { position: absolute; top: 40%; left: 50%; transform: translate(-50%,-50%) rotate(-18deg); font-size: 4rem; font-weight: 800; color: rgb(155 36 36 / 18%); border: 8px solid rgb(155 36 36 / 18%); padding: 0 1.5rem; border-radius: 12px; pointer-events: none; }
 
 @media print {

@@ -29,12 +29,12 @@ if ($accion === 'lista') {
     $where = $cond ? ' WHERE ' . implode(' AND ', $cond) : '';
     [$total, $paginas, $pagina, $offset] = paginar("SELECT COUNT(*) $from$where", $params, 10, $_GET['pagina'] ?? 1);
     $rows = filas_paginadas("SELECT dl.id_detalle_lote, dl.numero_lote, dl.fecha_fabricacion, dl.fecha_vencimiento, dl.cantidad_inicial, dl.estado,
-        m.nombre, m.concentracion, st.disponible $from$where ORDER BY dl.fecha_vencimiento, m.nombre", $params, $offset, 10);
+        m.nombre, m.concentracion, " . sql_presentacion('m') . " AS presentacion, st.disponible $from$where ORDER BY dl.fecha_vencimiento, m.nombre", $params, $offset, 10);
     ?>
     <div class="table-container"><table class="table is-fullwidth is-striped is-hoverable"><thead><tr><th>ID</th><th>Medicamento</th><th>Lote</th><th>Fabricación</th><th>Vencimiento</th><th class="col-num">Inicial</th><th class="col-num">Vendido</th><th class="col-num">Disponible</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>
     <?php if (!$rows): ?><tr><td colspan="10" class="has-text-centered">No hay lotes con ese filtro. Los lotes se crean al registrar una compra.</td></tr><?php endif; ?>
     <?php foreach ($rows as $r): $disp = (int)$r['disponible']; ?><tr><td><?= (int)$r['id_detalle_lote'] ?></td>
-        <td><strong><?= h($r['nombre']) ?></strong> <small><?= h($r['concentracion']) ?></small></td><td><?= h($r['numero_lote']) ?></td>
+        <td><strong><?= h($r['nombre']) ?></strong> <small><?= h(trim($r['concentracion'] . ' ' . $r['presentacion'])) ?></small></td><td><?= h($r['numero_lote']) ?></td>
         <td><?= fecha_fmt($r['fecha_fabricacion']) ?></td><td><?= fecha_fmt($r['fecha_vencimiento']) ?><br><?= badge_vencimiento($r['fecha_vencimiento'], $disp) ?></td>
         <td class="col-num"><?= (int)$r['cantidad_inicial'] ?></td><td class="col-num"><?= (int)$r['cantidad_inicial'] - $disp ?></td>
         <td class="col-num"><strong><?= $disp ?></strong><?= $disp <= 0 ? ' <span class="tag is-neutro">Agotado</span>' : '' ?></td>
@@ -49,14 +49,14 @@ if ($accion === 'lista') {
 if ($accion === 'form') {
     $id = (int)($_GET['id'] ?? 0);
     $d = fila('SELECT dl.id_detalle_lote, dl.id_lote, dl.numero_lote, dl.estado, dl.fecha_fabricacion, dl.fecha_vencimiento,
-            dl.cantidad_inicial, st.disponible, m.nombre, m.concentracion
+            dl.cantidad_inicial, st.disponible, m.nombre, m.concentracion, ' . sql_presentacion('m') . ' AS presentacion
         FROM dbo.detalle_lote dl INNER JOIN dbo.medicamento m ON m.id_medicamento=dl.id_medicamento ' . sql_stock_apply('dl') . '
         WHERE dl.id_detalle_lote=?', [$id]);
     if (!$d) { http_response_code(404); exit('<div class="notification is-warning">El lote no existe.</div>'); }
     modal_inicio('Estado del lote ' . $d['numero_lote'], 'lotes.php?accion=guardar', '560px');
     $vendido = (int)$d['cantidad_inicial'] - (int)$d['disponible'];
     $estadoActual = lote_estado_vendible($d['estado']) ? 'Activo' : $d['estado'];
-    echo '<input type="hidden" name="id" value="' . $id . '"><div class="content"><p><strong>' . h($d['nombre']) . '</strong> <small>' . h($d['concentracion']) . '</small></p>'
+    echo '<input type="hidden" name="id" value="' . $id . '"><div class="content"><p><strong>' . h($d['nombre']) . '</strong> <small>' . h(trim($d['concentracion'] . ' ' . $d['presentacion'])) . '</small></p>'
         . '<p><strong>ID de lote:</strong> ' . (int)$d['id_lote'] . '<br><strong>Número:</strong> ' . h($d['numero_lote'])
         . '<br><strong>Fabricación:</strong> ' . fecha_fmt($d['fecha_fabricacion']) . '<br><strong>Vencimiento:</strong> ' . fecha_fmt($d['fecha_vencimiento'])
         . '<br><strong>Cantidad inicial:</strong> ' . (int)$d['cantidad_inicial'] . '<br><strong>Vendido:</strong> ' . $vendido

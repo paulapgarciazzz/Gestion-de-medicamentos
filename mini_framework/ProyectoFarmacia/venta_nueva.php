@@ -28,7 +28,7 @@ function venta_buscar() {
         $condiciones[] = "(m.nombre COLLATE Latin1_General_CI_AI LIKE ? ESCAPE '~'
             OR m.codigo_barras COLLATE Latin1_General_CI_AI LIKE ? ESCAPE '~'
             OR m.concentracion COLLATE Latin1_General_CI_AI LIKE ? ESCAPE '~'
-            OR ISNULL(m.presentacion, '') COLLATE Latin1_General_CI_AI LIKE ? ESCAPE '~')";
+            OR ISNULL(p.nombre, '') COLLATE Latin1_General_CI_AI LIKE ? ESCAPE '~')";
         $like = '%' . $escaparLike($token) . '%';
         array_push($params, $like, $like, $like, $like);
     }
@@ -46,8 +46,9 @@ function venta_buscar() {
         array_push($params, $q, $q, $busqueda . '%', $busqueda . '%');
     }
     $rows = filas("SELECT TOP 20 lote.id_detalle_lote, lote.numero_lote, lote.fecha_vencimiento, lote.disponible,
-            m.id_medicamento, m.nombre, m.concentracion, m.presentacion, m.precio_venta, m.iva_porcentaje, m.requiere_receta
+            m.id_medicamento, m.nombre, m.concentracion, p.nombre AS presentacion, m.precio_venta, m.iva_porcentaje, m.requiere_receta
         FROM dbo.medicamento m
+        LEFT JOIN dbo.presentacion p ON p.id_presentacion=m.id_presentacion
         OUTER APPLY (
             SELECT TOP 1 dl.id_detalle_lote, dl.numero_lote, dl.fecha_vencimiento,
                 dl.cantidad_inicial - ISNULL((
@@ -95,7 +96,7 @@ function venta_buscar() {
 
 function venta_recetas() {
     $idc = (int)($_GET['id_cliente'] ?? 0);
-    $rs = $idc ? filas("SELECT r.id_receta, r.numero_receta, r.fecha_vencimiento, m.nombre FROM dbo.receta r INNER JOIN dbo.medicamento m ON m.id_medicamento=r.id_medicamento
+    $rs = $idc ? filas("SELECT r.id_receta, r.numero_receta, r.fecha_vencimiento, CONCAT(m.nombre,' '+m.concentracion,' '+" . sql_presentacion('m') . ") AS nombre FROM dbo.receta r INNER JOIN dbo.medicamento m ON m.id_medicamento=r.id_medicamento
         WHERE r.id_cliente=? AND r.fecha_vencimiento>=CAST(GETDATE() AS DATE) AND r.fecha_emision<=CAST(GETDATE() AS DATE) ORDER BY r.fecha_emision DESC", [$idc]) : [];
     echo '<div class="field"><label class="label">Receta médica <small class="has-text-grey">(obligatoria si hay medicamentos con receta)</small></label><div class="select is-fullwidth"><select name="id_receta"><option value="">Sin receta</option>';
     foreach ($rs as $r) echo '<option value="' . (int)$r['id_receta'] . '">N.º ' . (int)$r['numero_receta'] . ' · ' . h($r['nombre']) . ' · vence ' . fecha_fmt($r['fecha_vencimiento']) . '</option>';
@@ -129,12 +130,12 @@ function venta_pagina() {
       <div class="column is-4">
         <div class="box">
           <h2 class="title is-5">Cliente y pago</h2>
-          <div class="field"><label class="label">Cliente *</label>
-            <input class="input mb-2" type="search" id="filtro-cliente" placeholder="Nombre, identificación, teléfono o correo…" autocomplete="off" aria-controls="sel-cliente" onkeydown="if(event.key==='Enter')event.preventDefault()">
-            <div class="select is-fullwidth"><select name="id_cliente" id="sel-cliente" required hx-get="venta_nueva.php?accion=recetas" hx-trigger="change" hx-target="#zona-receta">
-              <option value="">Seleccione…</option>
-              <?php foreach ($clientes as $c): ?><option value="<?= (int)$c['id_cliente'] ?>" data-busqueda="<?= h(implode(' ', [$c['nombre'], $c['identificacion'], $c['telefono'], $c['correo']])) ?>"><?= h($c['nombre']) ?> (<?= h($c['identificacion']) ?>)</option><?php endforeach; ?>
-            </select></div>
+          <div class="field"><label class="label" for="filtro-cliente">Cliente *</label>
+            <input class="input" type="search" id="filtro-cliente" placeholder="Nombre, identificación, teléfono o correo…" autocomplete="off" aria-controls="resultados-cliente" onkeydown="if(event.key==='Enter')event.preventDefault()">
+            <input type="hidden" name="id_cliente" id="id-cliente">
+            <div id="resultados-cliente" class="resultados-busqueda" hidden>
+              <?php foreach ($clientes as $c): ?><button type="button" class="opcion-busqueda" value="<?= (int)$c['id_cliente'] ?>" data-busqueda="<?= h(implode(' ', [$c['nombre'], $c['identificacion'], $c['telefono'], $c['correo']])) ?>" data-nombre="<?= h($c['nombre'] . ' (' . $c['identificacion'] . ')') ?>"><strong><?= h($c['nombre']) ?></strong><small><?= h(implode(' · ', array_filter([$c['identificacion'], $c['telefono'], $c['correo']]))) ?></small></button><?php endforeach; ?>
+            </div>
             <p class="help" id="estado-busqueda-cliente" role="status"></p>
             <p class="help"><a href="clientes.php" target="_blank">Registrar un cliente nuevo</a></p></div>
           <div id="zona-receta"><div class="field"><label class="label">Receta médica</label><div class="select is-fullwidth"><select name="id_receta"><option value="">Sin receta</option></select></div></div></div>
@@ -213,23 +214,37 @@ function venta_pagina() {
     document.getElementById('zona-receta').addEventListener('change', () => Carrito.revisarReceta());
     document.body.addEventListener('htmx:afterSwap', (e) => { if (e.target.id === 'zona-receta') Carrito.revisarReceta(); });
     const filtroCliente = document.getElementById('filtro-cliente');
-    const selectorCliente = document.getElementById('sel-cliente');
+    const idCliente = document.getElementById('id-cliente');
+    const resultadosCliente = document.getElementById('resultados-cliente');
+    const opcionesCliente = Array.from(resultadosCliente.querySelectorAll('.opcion-busqueda'));
     const estadoBusquedaCliente = document.getElementById('estado-busqueda-cliente');
     const normalizarBusqueda = (texto) => String(texto || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    const cargarRecetas = () => htmx.ajax('GET', 'venta_nueva.php?accion=recetas', {target: '#zona-receta', values: {id_cliente: idCliente.value}});
     function filtrarClientes() {
+        // Al cambiar el texto se descarta el cliente elegido antes (y sus recetas).
+        if (idCliente.value) { idCliente.value = ''; cargarRecetas(); }
         const terminos = normalizarBusqueda(filtroCliente.value).split(/\s+/).filter(Boolean);
         let coincidencias = 0;
-        Array.from(selectorCliente.options).forEach((opcion) => {
-            if (!opcion.value) return;
-            const texto = normalizarBusqueda(opcion.dataset.busqueda || opcion.textContent);
+        opcionesCliente.forEach((opcion) => {
+            const texto = normalizarBusqueda(opcion.dataset.busqueda);
             const coincide = terminos.every((termino) => texto.includes(termino));
             opcion.hidden = !coincide;
             if (coincide) coincidencias++;
         });
+        resultadosCliente.hidden = terminos.length === 0 || coincidencias === 0;
         estadoBusquedaCliente.textContent = terminos.length
-            ? (coincidencias === 0 ? 'No se encontraron clientes.' : `${coincidencias} cliente${coincidencias === 1 ? '' : 's'} encontrado${coincidencias === 1 ? '' : 's'}.`)
+            ? (coincidencias === 0 ? 'No se encontraron clientes.' : `${coincidencias} cliente${coincidencias === 1 ? '' : 's'} encontrado${coincidencias === 1 ? '' : 's'}. Haga clic en el cliente.`)
             : `${coincidencias} clientes disponibles. Busque por nombre, identificación, teléfono o correo.`;
     }
+    resultadosCliente.addEventListener('click', (e) => {
+        const opcion = e.target.closest('.opcion-busqueda');
+        if (!opcion) return;
+        filtroCliente.value = opcion.dataset.nombre;
+        idCliente.value = opcion.value;
+        resultadosCliente.hidden = true;
+        estadoBusquedaCliente.textContent = 'Cliente seleccionado.';
+        cargarRecetas();
+    });
     filtroCliente.addEventListener('input', filtrarClientes);
     filtroCliente.addEventListener('search', filtrarClientes);
     filtrarClientes();

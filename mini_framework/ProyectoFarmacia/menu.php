@@ -28,11 +28,10 @@ $__grupo = function ($titulo, $clavesActivas, array $items) use ($__act) {
       <?= $__grupo('Compras', ['compras', 'compra_nueva'], [
             $__item('compra_nueva.php', 'Nueva compra', 'compra_nueva', ROLES_GESTION),
             $__item('compras.php', 'Historial de compras', 'compras', ROLES_GESTION)]) ?>
-      <?= $__grupo('Inventario', ['medicamentos', 'categorias', 'presentaciones', 'asignar', 'lotes', 'inventario'], [
+      <?= $__grupo('Inventario', ['medicamentos', 'categorias', 'presentaciones', 'lotes', 'inventario'], [
             $__item('index.php', 'Medicamentos', 'medicamentos', ROLES_GESTION),
             $__item('categorias.php', 'Categorías', 'categorias', ROLES_GESTION),
             $__item('presentaciones.php', 'Presentaciones', 'presentaciones', ROLES_GESTION),
-            $__item('presentaciones_asignar.php', 'Presentaciones por medicamento', 'asignar', ROLES_GESTION),
             $__item('lotes.php', 'Lotes', 'lotes', ROLES_GESTION),
             $__item('inventario.php', 'Existencias (stock)', 'inventario', ROLES_GESTION)]) ?>
       <?= $__grupo('Personas', ['clientes', 'proveedores', 'recetas'], [

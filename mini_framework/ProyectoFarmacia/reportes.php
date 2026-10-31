@@ -15,9 +15,9 @@ $utilidad = (float)escalar("SELECT ISNULL(SUM(dv.subtotal-dv.descuento-dv.cantid
     INNER JOIN dbo.detalle_lote dl ON dl.id_detalle_lote=dv.id_detalle_lote INNER JOIN dbo.medicamento m ON m.id_medicamento=dl.id_medicamento WHERE v.estado<>'Anulada' AND $f", $p);
 $porMetodo = filas("SELECT v.metodo_pago, COUNT(*) AS n, SUM(v.total) AS total FROM dbo.venta v WHERE v.estado<>'Anulada' AND $f GROUP BY v.metodo_pago ORDER BY total DESC", $p);
 $porDia = filas("SELECT CAST(v.fecha_venta AS DATE) AS dia, COUNT(*) AS n, SUM(v.total) AS total FROM dbo.venta v WHERE v.estado<>'Anulada' AND $f GROUP BY CAST(v.fecha_venta AS DATE) ORDER BY dia", $p);
-$top = filas("SELECT TOP 10 m.nombre, m.concentracion, SUM(dv.cantidad) AS unidades, SUM(dv.total) AS monto FROM dbo.detalle_venta dv INNER JOIN dbo.venta v ON v.id_venta=dv.id_venta
+$top = filas("SELECT TOP 10 m.nombre, m.concentracion, " . sql_presentacion('m') . " AS presentacion, SUM(dv.cantidad) AS unidades, SUM(dv.total) AS monto FROM dbo.detalle_venta dv INNER JOIN dbo.venta v ON v.id_venta=dv.id_venta
     INNER JOIN dbo.detalle_lote dl ON dl.id_detalle_lote=dv.id_detalle_lote INNER JOIN dbo.medicamento m ON m.id_medicamento=dl.id_medicamento WHERE v.estado<>'Anulada' AND $f
-    GROUP BY m.id_medicamento, m.nombre, m.concentracion ORDER BY unidades DESC", $p);
+    GROUP BY m.id_medicamento, m.nombre, m.concentracion, m.id_presentacion ORDER BY unidades DESC", $p);
 $compras = fila('SELECT COUNT(*) AS n, ISNULL(SUM(c.total),0) AS total FROM dbo.compra c WHERE c.fecha_compra>=CAST(? AS DATE) AND c.fecha_compra<DATEADD(DAY,1,CAST(? AS DATE))', $p);
 $porProv = filas('SELECT p.nombre, COUNT(*) AS n, SUM(c.total) AS total FROM dbo.compra c INNER JOIN dbo.proveedor p ON p.id_proveedor=c.id_proveedor
     WHERE c.fecha_compra>=CAST(? AS DATE) AND c.fecha_compra<DATEADD(DAY,1,CAST(? AS DATE)) GROUP BY p.nombre ORDER BY total DESC', $p);
@@ -50,7 +50,7 @@ encabezado('Reportes', 'Del ' . fecha_fmt($desde) . ' al ' . fecha_fmt($hasta), 
 <div class="columns">
   <div class="column"><div class="box"><h2 class="title is-5">10 medicamentos más vendidos</h2><table class="table is-fullwidth is-striped"><thead><tr><th>Medicamento</th><th class="col-num">Unidades</th><th class="col-num">Monto</th></tr></thead><tbody>
     <?php if (!$top): ?><tr><td colspan="3" class="has-text-grey">Sin ventas en el período.</td></tr><?php endif; ?>
-    <?php foreach ($top as $t): ?><tr><td><?= h($t['nombre']) ?> <small><?= h($t['concentracion']) ?></small></td><td class="col-num"><?= (int)$t['unidades'] ?></td><td class="col-num"><?= dinero($t['monto']) ?></td></tr><?php endforeach; ?>
+    <?php foreach ($top as $t): ?><tr><td><?= h($t['nombre']) ?> <small><?= h(trim($t['concentracion'] . ' ' . $t['presentacion'])) ?></small></td><td class="col-num"><?= (int)$t['unidades'] ?></td><td class="col-num"><?= dinero($t['monto']) ?></td></tr><?php endforeach; ?>
   </tbody></table></div></div>
   <div class="column"><div class="box"><h2 class="title is-5">Compras por proveedor</h2><table class="table is-fullwidth is-striped"><thead><tr><th>Proveedor</th><th class="col-num">Compras</th><th class="col-num">Total</th></tr></thead><tbody>
     <?php if (!$porProv): ?><tr><td colspan="3" class="has-text-grey">Sin compras en el período.</td></tr><?php endif; ?>

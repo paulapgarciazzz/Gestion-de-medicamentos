@@ -296,14 +296,14 @@ body {
 }
 
 .button.is-light {
-    background: #f8fafc;
-    border-color: #e2e8f0;
+    background: #ffffff;
+    border: 1px solid #94a3b8;
     color: #334155;
 }
 
 .button.is-light:hover {
     background: #f0fdf4;
-    border-color: #bbf7d0;
+    border-color: #15803d;
     color: #14532d;
 }
 

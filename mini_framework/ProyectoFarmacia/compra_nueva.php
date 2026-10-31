@@ -16,23 +16,24 @@ switch ($_GET['accion'] ?? 'pagina') {
 function compra_buscar() {
     $q = trim($_GET['q'] ?? '');
     $like = '%' . $q . '%';
-    $rows = filas('SELECT TOP 15 m.id_medicamento, m.nombre, m.concentracion, m.presentacion, m.precio_costo, m.iva_porcentaje, c.nombre AS categoria
+    $rows = filas('SELECT TOP 15 m.id_medicamento, m.nombre, m.concentracion, p.nombre AS presentacion, m.precio_costo, m.iva_porcentaje, c.nombre AS categoria
         FROM dbo.medicamento m INNER JOIN dbo.categoria c ON c.id_categoria=m.id_categoria
-        WHERE m.nombre LIKE ? OR m.codigo_barras LIKE ? OR m.concentracion LIKE ? OR c.nombre LIKE ? ORDER BY m.nombre', [$like, $like, $like, $like]);
+        LEFT JOIN dbo.presentacion p ON p.id_presentacion=m.id_presentacion
+        WHERE m.nombre LIKE ? OR m.codigo_barras LIKE ? OR m.concentracion LIKE ? OR c.nombre LIKE ? ORDER BY m.nombre, p.nombre',[$like, $like, $like, $like]);
     if (!$rows) { echo '<p class="has-text-grey">No se encontraron medicamentos. Regístrelos primero en <a href="index.php">Medicamentos</a>.</p>'; return; }
     echo '<div class="table-container"><table class="table is-fullwidth is-narrow is-hoverable"><thead><tr><th>Medicamento</th><th>Categoría</th><th class="col-num">Costo actual</th><th class="col-num">IVA</th><th></th></tr></thead><tbody>';
     foreach ($rows as $r) {
         echo '<tr><td><strong>' . h($r['nombre']) . '</strong> <small>' . h(trim($r['concentracion'] . ' ' . $r['presentacion'])) . '</small></td><td>' . h($r['categoria']) . '</td>'
             . '<td class="col-num">' . dinero($r['precio_costo']) . '</td><td class="col-num">' . number_format((float)$r['iva_porcentaje'], 2) . '%</td>'
             . '<td><button type="button" class="button is-small is-info" onclick="CompraCar.agregar(this)" data-med="' . (int)$r['id_medicamento'] . '"'
-            . ' data-nombre="' . h(trim($r['nombre'] . ' ' . $r['concentracion'])) . '" data-costo="' . h($r['precio_costo']) . '" data-iva="' . h($r['iva_porcentaje']) . '">Agregar</button></td></tr>';
+            . ' data-nombre="' . h(trim($r['nombre'] . ' ' . $r['concentracion'] . ' ' . $r['presentacion'])) . '" data-costo="' . h($r['precio_costo']) . '" data-iva="' . h($r['iva_porcentaje']) . '">Agregar</button></td></tr>';
     }
     echo '</tbody></table></div>';
 }
 
 function compra_pagina() {
     $_SESSION['compra_token'] = bin2hex(random_bytes(16));
-    $proveedores = filas('SELECT id_proveedor, nombre, condiciones_pago FROM dbo.proveedor ORDER BY nombre');
+    $proveedores = filas('SELECT id_proveedor, nombre, identificacion, telefono, correo FROM dbo.proveedor ORDER BY nombre');
     pagina_inicio('Nueva compra', 'compra_nueva');
     encabezado('Nueva compra', 'Registre la factura del proveedor y los lotes que ingresan al inventario', '<a class="button is-info" href="compras.php">Historial de compras</a>');
     if (!$proveedores) {
@@ -44,8 +45,13 @@ function compra_pagina() {
     <form id="form-compra" hx-post="compra_nueva.php?accion=guardar" hx-target="#mensaje-compra" hx-swap="innerHTML">
     <input type="hidden" name="token" value="<?= h($_SESSION['compra_token']) ?>">
     <div class="box"><div class="columns">
-      <div class="column is-5"><label class="label">Proveedor *</label><div class="select is-fullwidth"><select name="id_proveedor" required>
-        <option value="">Seleccione…</option><?php foreach ($proveedores as $p): ?><option value="<?= (int)$p['id_proveedor'] ?>"><?= h($p['nombre']) ?></option><?php endforeach; ?></select></div></div>
+      <div class="column is-5"><label class="label" for="filtro-proveedor">Proveedor *</label>
+        <input class="input" type="search" id="filtro-proveedor" placeholder="Nombre, identificación, teléfono o correo…" autocomplete="off" aria-controls="resultados-proveedor" onkeydown="if(event.key==='Enter')event.preventDefault()">
+        <input type="hidden" name="id_proveedor" id="id-proveedor">
+        <div id="resultados-proveedor" class="resultados-busqueda" hidden>
+          <?php foreach ($proveedores as $p): ?><button type="button" class="opcion-busqueda" value="<?= (int)$p['id_proveedor'] ?>" data-busqueda="<?= h(implode(' ', [$p['nombre'], $p['identificacion'], $p['telefono'], $p['correo']])) ?>" data-nombre="<?= h($p['nombre'] . ' (' . $p['identificacion'] . ')') ?>"><strong><?= h($p['nombre']) ?></strong><small><?= h(implode(' · ', array_filter([$p['identificacion'], $p['telefono'], $p['correo']]))) ?></small></button><?php endforeach; ?>
+        </div>
+        <p class="help" id="estado-busqueda-proveedor" role="status"></p></div>
       <div class="column is-3"><label class="label">N.º de factura *</label><input class="input" type="number" min="1" name="numero_factura" required></div>
       <div class="column is-4"><label class="label">Fecha de la compra *</label><input class="input" type="date" name="fecha_compra" value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>" required></div>
     </div></div>
@@ -109,6 +115,39 @@ function compra_pagina() {
     const formCompra = document.getElementById('form-compra');
     formCompra.addEventListener('htmx:beforeRequest', (e) => { if (e.detail.elt === formCompra) document.getElementById('btn-registrar').disabled = true; });
     formCompra.addEventListener('htmx:afterRequest', (e) => { if (e.detail.elt === formCompra) CompraCar.refrescar(); });
+    const filtroProveedor = document.getElementById('filtro-proveedor');
+    const idProveedor = document.getElementById('id-proveedor');
+    const resultadosProveedor = document.getElementById('resultados-proveedor');
+    const opcionesProveedor = Array.from(resultadosProveedor.querySelectorAll('.opcion-busqueda'));
+    const estadoBusquedaProveedor = document.getElementById('estado-busqueda-proveedor');
+    const normalizarBusqueda = (texto) => String(texto || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    function filtrarProveedores() {
+        // Al cambiar el texto se descarta el proveedor elegido antes.
+        idProveedor.value = '';
+        const terminos = normalizarBusqueda(filtroProveedor.value).split(/\s+/).filter(Boolean);
+        let coincidencias = 0;
+        opcionesProveedor.forEach((opcion) => {
+            const texto = normalizarBusqueda(opcion.dataset.busqueda);
+            const coincide = terminos.every((termino) => texto.includes(termino));
+            opcion.hidden = !coincide;
+            if (coincide) coincidencias++;
+        });
+        resultadosProveedor.hidden = terminos.length === 0 || coincidencias === 0;
+        estadoBusquedaProveedor.textContent = terminos.length
+            ? (coincidencias === 0 ? 'No se encontraron proveedores.' : `${coincidencias} proveedor${coincidencias === 1 ? '' : 'es'} encontrado${coincidencias === 1 ? '' : 's'}. Haga clic en el proveedor.`)
+            : `${coincidencias} proveedores disponibles. Busque por nombre, identificación, teléfono o correo.`;
+    }
+    resultadosProveedor.addEventListener('click', (e) => {
+        const opcion = e.target.closest('.opcion-busqueda');
+        if (!opcion) return;
+        filtroProveedor.value = opcion.dataset.nombre;
+        idProveedor.value = opcion.value;
+        resultadosProveedor.hidden = true;
+        estadoBusquedaProveedor.textContent = 'Proveedor seleccionado.';
+    });
+    filtroProveedor.addEventListener('input', filtrarProveedores);
+    filtroProveedor.addEventListener('search', filtrarProveedores);
+    filtrarProveedores();
     </script>
     <?php
     pagina_fin();

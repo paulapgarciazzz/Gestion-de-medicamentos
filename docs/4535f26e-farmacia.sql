@@ -1,7 +1,7 @@
 /* =====================================================================
    Script de base de datos: Farmacia
    Motor: SQL Server (T-SQL)
-   Generado a partir del diagrama entidad-relacion (15 tablas)
+   Generado a partir del diagrama entidad-relacion (14 tablas)
    ===================================================================== */
 
 CREATE DATABASE farmacia;
@@ -88,7 +88,7 @@ CREATE TABLE medicamento (
     id_medicamento            INT IDENTITY(1,1) NOT NULL,
     id_categoria              INT               NOT NULL,
     nombre                    VARCHAR(100)      NOT NULL,
-    presentacion              VARCHAR(50)       NULL,
+    id_presentacion           INT               NULL,
     concentracion             VARCHAR(50)       NULL,
     precio_venta              DECIMAL(12,2)     NOT NULL,
     requiere_receta           BIT               NOT NULL DEFAULT 0,
@@ -98,20 +98,15 @@ CREATE TABLE medicamento (
     iva_porcentaje            DECIMAL(5,2)      NOT NULL,
     CONSTRAINT PK_medicamento PRIMARY KEY (id_medicamento),
     CONSTRAINT FK_medicamento_categoria
-        FOREIGN KEY (id_categoria) REFERENCES categoria (id_categoria)
+        FOREIGN KEY (id_categoria) REFERENCES categoria (id_categoria),
+    CONSTRAINT FK_medicamento_presentacion
+        FOREIGN KEY (id_presentacion) REFERENCES presentacion (id_presentacion)
 );
 GO
 
-CREATE TABLE medicamento_presentacion (
-    id_medicamento_presentacion INT IDENTITY(1,1) NOT NULL,
-    id_presentacion             INT               NOT NULL,
-    id_medicamento              INT               NOT NULL,
-    CONSTRAINT PK_medicamento_presentacion PRIMARY KEY (id_medicamento_presentacion),
-    CONSTRAINT FK_medpres_presentacion
-        FOREIGN KEY (id_presentacion) REFERENCES presentacion (id_presentacion),
-    CONSTRAINT FK_medpres_medicamento
-        FOREIGN KEY (id_medicamento)  REFERENCES medicamento (id_medicamento)
-);
+-- Cada presentacion es un medicamento aparte: el nombre se puede repetir, el codigo de barras no.
+CREATE UNIQUE INDEX UQ_medicamento_codigo_barras
+    ON medicamento (codigo_barras) WHERE codigo_barras IS NOT NULL;
 GO
 
 CREATE TABLE detalle_lote (
