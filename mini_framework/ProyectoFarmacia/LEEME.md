@@ -18,7 +18,7 @@ El archivo `.env` contiene configuración privada: no lo suba a GitHub ni lo env
 ## Qué tabla se administra en cada pantalla
 | Tabla(s) | Pantalla | Qué hace |
 |---|---|---|
-| medicamento | `index.php` (la suya) | sin cambios |
+| medicamento | `index.php` (la suya) | CRUD (se le agregó login y menú) |
 | categoria | `categorias.php` | CRUD |
 | presentacion | `presentaciones.php` | CRUD |
 | medicamento_presentacion | `presentaciones_asignar.php` | asignar presentaciones a cada medicamento |
@@ -43,11 +43,7 @@ El archivo `.env` contiene configuración privada: no lo suba a GitHub ni lo env
 
 ## Cosas que debe saber
 - **Contraseñas**: la columna `usuario.contrasenna` es `VARCHAR(8)`, así que solo permite contraseñas de 4 a 8 caracteres en texto plano. Es una limitación del diseño de la base de datos. Si ejecuta `mejoras_opcionales.sql` (amplía la columna) el sistema pasa solo a guardar contraseñas con hash.
-- **Tus pantallas de medicamentos no tienen login ni menú.** Para integrarlas (opcional, son 3 líneas en `index.php`):
-  1. al inicio del archivo: `<?php require_once 'lib.php'; requerir_login(ROLES_GESTION); ?>`
-  2. justo después de `<body>`: `<?php include 'menu.php'; ?>`
-  3. reemplace el `<div id="aviso-temporal" …>…</div>` por `<?php include 'dialogos.php'; ?>`
-- **Posible error en tu botón «Eliminar» de medicamentos**: `avisos.js` espera un diálogo `#confirmar-eliminacion` que `index.php` no trae, por lo que el botón probablemente no hace nada. El paso 3 de arriba lo corrige. Los módulos nuevos ya incluyen ese diálogo.
+- **`index.php` ya está integrado** con el resto del sistema: exige login (Administrador o Farmaceutico), muestra el menú principal (con «Medicamentos» marcado en *Inventario*) y usa `dialogos.php` para el diálogo de confirmación y los avisos.
 - Requiere PHP 7.4 o superior con `pdo_sqlsrv`.
 - Las compras no se pueden editar ni borrar (por trazabilidad de lotes y stock); las ventas se anulan, no se borran.
 - Los montos usan ₡ y el formato 1.234,56 igual que su pantalla de medicamentos.
