@@ -1,6 +1,6 @@
 # Sistema de Farmacia – módulos nuevos
 
-Se agregaron los módulos que faltaban para usar las **15 tablas** de la base de datos.
+Se agregaron los módulos que faltaban para usar las **14 tablas** de la base de datos.
 **No se modificó ninguno de tus archivos** (`index.php`, `producto_*.php`, `productos_lista.php`,
 `estilos.css`, `avisos.js`, `conexion.php`, `htmx.min.js`). Todo lo nuevo usa la misma tecnología
 (PHP + SQL Server PDO + HTMX + Bulma) y los mismos colores.
@@ -18,10 +18,9 @@ El archivo `.env` contiene configuración privada: no lo suba a GitHub ni lo env
 ## Qué tabla se administra en cada pantalla
 | Tabla(s) | Pantalla | Qué hace |
 |---|---|---|
-| medicamento | `index.php` (la suya) | CRUD (se le agregó login y menú) |
+| medicamento | `index.php` (la suya) | CRUD (se le agregó login y menú). Cada presentación es un medicamento aparte (`id_presentacion`); el nombre se puede repetir, el código de barras no |
 | categoria | `categorias.php` | CRUD |
 | presentacion | `presentaciones.php` | CRUD |
-| medicamento_presentacion | `presentaciones_asignar.php` | asignar presentaciones a cada medicamento |
 | proveedor | `proveedores.php` | CRUD |
 | cliente | `clientes.php` | CRUD |
 | usuario | `usuarios.php` | CRUD + roles + login (`login.php`, `logout.php`) |

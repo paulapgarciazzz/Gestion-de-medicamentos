@@ -12,7 +12,7 @@ if ($gestion) {
     $porVencer = (int)escalar("SELECT COUNT(*) FROM dbo.detalle_lote dl " . sql_stock_apply('dl') . " WHERE " . sql_lote_estado_vendible('dl') . " AND dl.fecha_vencimiento>=$hoy AND dl.fecha_vencimiento<=DATEADD(DAY,90,$hoy) AND st.disponible>0");
     $vencidos = (int)escalar("SELECT COUNT(*) FROM dbo.detalle_lote dl " . sql_stock_apply('dl') . " WHERE dl.estado='Activo' AND dl.fecha_vencimiento<$hoy AND st.disponible>0");
     $bajo = (int)escalar('SELECT COUNT(*) FROM (' . sql_inventario() . ') x WHERE x.stock<=10');
-    $proximos = filas("SELECT TOP 6 m.nombre, dl.numero_lote, dl.fecha_vencimiento, st.disponible FROM dbo.detalle_lote dl INNER JOIN dbo.medicamento m ON m.id_medicamento=dl.id_medicamento " . sql_stock_apply('dl')
+    $proximos = filas("SELECT TOP 6 m.nombre, m.concentracion, " . sql_presentacion('m') . " AS presentacion, dl.numero_lote, dl.fecha_vencimiento, st.disponible FROM dbo.detalle_lote dl INNER JOIN dbo.medicamento m ON m.id_medicamento=dl.id_medicamento " . sql_stock_apply('dl')
         . " WHERE " . sql_lote_estado_vendible('dl') . " AND dl.fecha_vencimiento>=$hoy AND dl.fecha_vencimiento<=DATEADD(DAY,90,$hoy) AND st.disponible>0 ORDER BY dl.fecha_vencimiento");
 }
 $ultimas = filas('SELECT TOP 6 v.id_venta, v.fecha_venta, v.total, v.estado, ' . sql_nombre_cliente('c') . ' AS cliente FROM dbo.venta v INNER JOIN dbo.cliente c ON c.id_cliente=v.id_cliente ORDER BY v.fecha_venta DESC, v.id_venta DESC');
@@ -43,7 +43,7 @@ encabezado('Bienvenido, ' . usuario_actual()['nombre'], 'Resumen de la farmacia 
   <div class="column"><div class="box"><h2 class="title is-5">Próximos a vencer</h2>
     <table class="table is-fullwidth is-striped"><tbody>
     <?php if (!$proximos): ?><tr><td class="has-text-grey">No hay lotes por vencer en los próximos 90 días.</td></tr><?php endif; ?>
-    <?php foreach ($proximos as $p): ?><tr><td><strong><?= h($p['nombre']) ?></strong><br><small>Lote <?= h($p['numero_lote']) ?></small></td><td><?= fecha_fmt($p['fecha_vencimiento']) ?></td><td class="col-num"><?= (int)$p['disponible'] ?> u.</td></tr><?php endforeach; ?>
+    <?php foreach ($proximos as $p): ?><tr><td><strong><?= h($p['nombre']) ?></strong> <small><?= h(trim($p['concentracion'] . ' ' . $p['presentacion'])) ?></small><br><small>Lote <?= h($p['numero_lote']) ?></small></td><td><?= fecha_fmt($p['fecha_vencimiento']) ?></td><td class="col-num"><?= (int)$p['disponible'] ?> u.</td></tr><?php endforeach; ?>
     </tbody></table></div></div>
   <?php endif; ?>
 </div>
@@ -56,7 +56,7 @@ $modulos = [
     ['compra_nueva.php', 'Nueva compra', 'Ingresar facturas y lotes', ROLES_GESTION], ['compras.php', 'Historial de compras', 'Facturas de proveedores', ROLES_GESTION],
     ['index.php', 'Medicamentos', 'Catálogo de productos', ROLES_GESTION], ['inventario.php', 'Existencias', 'Stock por medicamento', ROLES_GESTION],
     ['lotes.php', 'Lotes', 'Vencimientos y estado', ROLES_GESTION], ['categorias.php', 'Categorías', 'Clasificación', ROLES_GESTION],
-    ['presentaciones.php', 'Presentaciones', 'Tabletas, jarabes…', ROLES_GESTION], ['presentaciones_asignar.php', 'Presentaciones por medicamento', 'Asignar presentaciones', ROLES_GESTION],
+    ['presentaciones.php', 'Presentaciones', 'Tabletas, jarabes…', ROLES_GESTION],
     ['clientes.php', 'Clientes', 'Datos de clientes', ROLES], ['recetas.php', 'Recetas', 'Recetas médicas', ROLES],
     ['proveedores.php', 'Proveedores', 'Empresas proveedoras', ROLES_GESTION], ['reportes.php', 'Reportes', 'Ventas, compras y utilidad', ROLES_ADMIN],
     ['usuarios.php', 'Usuarios', 'Accesos y roles', ROLES_ADMIN], ['auditoria.php', 'Auditoría', 'Quién hizo qué', ROLES_ADMIN],

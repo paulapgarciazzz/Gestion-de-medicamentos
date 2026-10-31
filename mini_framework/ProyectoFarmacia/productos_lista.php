@@ -1,10 +1,10 @@
 <?php
 require_once 'conexion.php';
 $buscar=trim($_GET['buscar']??''); $porPagina=10; $paginaSolicitada=filter_var($_GET['pagina']??1,FILTER_VALIDATE_INT); if(!$paginaSolicitada||$paginaSolicitada<1)$paginaSolicitada=1;
-$sql=' FROM dbo.medicamento m INNER JOIN dbo.categoria c ON c.id_categoria=m.id_categoria'; $params=[];
+$sql=' FROM dbo.medicamento m INNER JOIN dbo.categoria c ON c.id_categoria=m.id_categoria LEFT JOIN dbo.presentacion p ON p.id_presentacion=m.id_presentacion'; $params=[];
 if($buscar!==''){ $sql.=' WHERE m.nombre LIKE ? OR m.codigo_barras LIKE ? OR c.nombre LIKE ? OR m.concentracion LIKE ?'; $q='%'.$buscar.'%'; $params=[$q,$q,$q,$q]; }
 $stmt=$pdo->prepare('SELECT COUNT(*)'.$sql);$stmt->execute($params);$total=(int)$stmt->fetchColumn();$paginas=max(1,(int)ceil($total/$porPagina));$pagina=min($paginas,$paginaSolicitada);$offset=($pagina-1)*$porPagina;
-$stmt=$pdo->prepare('SELECT m.id_medicamento,m.nombre,m.presentacion,m.concentracion,m.precio_venta,m.precio_costo,m.iva_porcentaje,m.requiere_receta,m.codigo_barras,c.nombre AS categoria'.$sql.' ORDER BY m.nombre OFFSET ? ROWS FETCH NEXT ? ROWS ONLY');$i=1;foreach($params as $p)$stmt->bindValue($i++,$p,PDO::PARAM_STR);$stmt->bindValue($i++,$offset,PDO::PARAM_INT);$stmt->bindValue($i,$porPagina,PDO::PARAM_INT);$stmt->execute();$medicamentos=$stmt->fetchAll();
+$stmt=$pdo->prepare('SELECT m.id_medicamento,m.nombre,p.nombre AS presentacion,m.concentracion,m.precio_venta,m.precio_costo,m.iva_porcentaje,m.requiere_receta,m.codigo_barras,c.nombre AS categoria'.$sql.' ORDER BY m.nombre,p.nombre OFFSET ? ROWS FETCH NEXT ? ROWS ONLY');$i=1;foreach($params as $p)$stmt->bindValue($i++,$p,PDO::PARAM_STR);$stmt->bindValue($i++,$offset,PDO::PARAM_INT);$stmt->bindValue($i,$porPagina,PDO::PARAM_INT);$stmt->execute();$medicamentos=$stmt->fetchAll();
 function h($v){return htmlspecialchars((string)($v??''),ENT_QUOTES,'UTF-8');}
 ?>
 <input type="hidden" id="pagina-productos" name="pagina" value="<?=$pagina?>"><div class="table-container"><table class="table is-fullwidth is-striped is-hoverable"><thead><tr><th>ID</th><th>Medicamento</th><th>Categoría</th><th>Presentación</th><th>Concentración</th><th>Precio venta</th><th>IVA %</th><th>Receta</th><th>Acciones</th></tr></thead><tbody>

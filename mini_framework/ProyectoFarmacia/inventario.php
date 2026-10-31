@@ -27,7 +27,7 @@ if ($accion === 'lista') {
     <div class="table-container"><table class="table is-fullwidth is-striped is-hoverable"><thead><tr><th>ID</th><th>Medicamento</th><th>Categoría</th><th class="col-num">Costo</th><th class="col-num">Venta</th><th class="col-num">Disponible</th><th class="col-num">Vencido</th><th>Próx. vencimiento</th></tr></thead><tbody>
     <?php if (!$rows): ?><tr><td colspan="8" class="has-text-centered">No hay medicamentos con ese filtro.</td></tr><?php endif; ?>
     <?php foreach ($rows as $r): $s = (int)$r['stock']; ?><tr><td><?= (int)$r['id_medicamento'] ?></td>
-        <td><strong><?= h($r['nombre']) ?></strong> <small><?= h($r['concentracion']) ?></small></td><td><?= h($r['categoria']) ?></td>
+        <td><strong><?= h($r['nombre']) ?></strong> <small><?= h(trim($r['concentracion'] . ' ' . $r['presentacion'])) ?></small></td><td><?= h($r['categoria']) ?></td>
         <td class="col-num"><?= dinero($r['precio_costo']) ?></td><td class="col-num"><?= dinero($r['precio_venta']) ?></td>
         <td class="col-num"><strong><?= $s ?></strong> <?= $s <= 0 ? '<span class="tag is-vencido">Sin stock</span>' : ($s <= $umbral ? '<span class="tag is-porvencer">Bajo</span>' : '') ?></td>
         <td class="col-num"><?= (int)$r['vencido'] > 0 ? '<span class="tag is-vencido">' . (int)$r['vencido'] . '</span>' : '0' ?></td>
