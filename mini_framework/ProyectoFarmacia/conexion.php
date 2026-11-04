@@ -1,4 +1,3 @@
-
 <?php
 
 // Buscar el archivo .env en las ubicaciones posibles.

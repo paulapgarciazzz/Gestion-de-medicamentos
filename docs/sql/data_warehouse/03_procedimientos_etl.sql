@@ -9,6 +9,9 @@
      5. fact_ventas      -> MERGE por id_detalle_venta: inserta lineas nuevas y
                             actualiza las que cambiaron (por ejemplo una venta
                             que se anulo despues de la ultima carga)
+     6. dim_lote         -> MERGE: inserta lotes nuevos, actualiza estado/costo
+     7. fact_inventario  -> MERGE por (dia, lote): foto del inventario y la
+                            caducidad de HOY; si se repite el mismo dia, se actualiza
 
    Idempotente: ejecutarlo varias veces no duplica filas (claves naturales unicas
    + MERGE). Solo LEE la base farmacia a traves de los sinonimos del esquema origen.
@@ -247,6 +250,135 @@ BEGIN
 END
 GO
 
+/* --------------------------- 6. Dimension lote --------------------------- */
+CREATE OR ALTER PROCEDURE etl.sp_cargar_dim_lote
+    @insertados   INT OUTPUT,
+    @actualizados INT OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @acciones TABLE (accion NVARCHAR(10));
+
+    MERGE dw.dim_lote AS d
+    USING (
+        SELECT dl.id_detalle_lote,
+               dl.numero_lote,
+               dm.medicamento_key,
+               dl.fecha_fabricacion,
+               dl.fecha_vencimiento,
+               dl.estado,
+               cu.costo_unitario
+        FROM origen.detalle_lote dl
+        INNER JOIN origen.medicamento m    ON m.id_medicamento = dl.id_medicamento
+        INNER JOIN dw.dim_medicamento dm   ON dm.id_medicamento = dl.id_medicamento
+        -- Mismo criterio de costo que fact_ventas: promedio ponderado de las compras del lote
+        OUTER APPLY (SELECT CAST(ISNULL(SUM(c.subtotal) / NULLIF(SUM(c.cantidad), 0), m.precio_costo) AS DECIMAL(12,2)) AS costo_unitario
+                     FROM origen.detalle_compra c
+                     WHERE c.id_detalle_lote = dl.id_detalle_lote) cu
+    ) AS s
+    ON d.id_detalle_lote = s.id_detalle_lote
+    WHEN MATCHED AND EXISTS (
+            SELECT s.numero_lote, s.medicamento_key, s.fecha_fabricacion, s.fecha_vencimiento, s.estado, s.costo_unitario
+            EXCEPT
+            SELECT d.numero_lote, d.medicamento_key, d.fecha_fabricacion, d.fecha_vencimiento, d.estado, d.costo_unitario)
+        THEN UPDATE SET numero_lote = s.numero_lote, medicamento_key = s.medicamento_key,
+                        fecha_fabricacion = s.fecha_fabricacion, fecha_vencimiento = s.fecha_vencimiento,
+                        estado = s.estado, costo_unitario = s.costo_unitario, fecha_actualizacion = SYSDATETIME()
+    WHEN NOT MATCHED BY TARGET
+        THEN INSERT (id_detalle_lote, numero_lote, medicamento_key, fecha_fabricacion, fecha_vencimiento, estado, costo_unitario)
+             VALUES (s.id_detalle_lote, s.numero_lote, s.medicamento_key, s.fecha_fabricacion, s.fecha_vencimiento, s.estado, s.costo_unitario)
+    OUTPUT $action INTO @acciones;
+
+    SELECT @insertados   = ISNULL(SUM(IIF(accion = N'INSERT', 1, 0)), 0),
+           @actualizados = ISNULL(SUM(IIF(accion = N'UPDATE', 1, 0)), 0)
+    FROM @acciones;
+END
+GO
+
+/* --------------------------- 7. Hechos de inventario y caducidad (foto del dia) --------------------------- */
+CREATE OR ALTER PROCEDURE etl.sp_cargar_fact_inventario
+    @fecha        DATE,
+    @id_carga     INT,
+    @insertados   INT OUTPUT,
+    @actualizados INT OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @acciones TABLE (accion NVARCHAR(10));
+    DECLARE @fecha_key INT = YEAR(@fecha) * 10000 + MONTH(@fecha) * 100 + DAY(@fecha);
+
+    IF NOT EXISTS (SELECT 1 FROM dw.dim_fecha WHERE fecha_key = @fecha_key)
+        THROW 50303, 'La fecha de la foto de inventario no esta en dim_fecha.', 1;
+
+    MERGE dw.fact_inventario AS d
+    USING (
+        SELECT x.*,
+               CAST(x.unidades_disponibles * x.costo_unitario AS DECIMAL(14,2)) AS valor_costo,
+               CAST(x.unidades_disponibles * x.precio_venta   AS DECIMAL(14,2)) AS valor_venta,
+               DATEDIFF(DAY, @fecha, x.fecha_vencimiento) AS dias_para_vencer,
+               CASE WHEN x.fecha_vencimiento < @fecha                  THEN N'Vencido'
+                    WHEN x.fecha_vencimiento <= DATEADD(DAY, 90, @fecha) THEN N'Por vencer'
+                    ELSE N'Vigente' END AS estado_caducidad,
+               CAST(CASE WHEN x.fecha_vencimiento <= DATEADD(DAY, 90, @fecha) AND x.unidades_disponibles > 0
+                         THEN x.unidades_disponibles * x.costo_unitario ELSE 0 END AS DECIMAL(14,2)) AS valor_en_riesgo
+        FROM (
+            SELECT l.lote_key,
+                   l.medicamento_key,
+                   dl.estado AS estado_lote,
+                   CAST(IIF(UPPER(LTRIM(RTRIM(dl.estado))) IN ('ACTIVO', 'DISPONIBLE', 'POR VENCER')
+                            AND dl.fecha_vencimiento >= @fecha, 1, 0) AS BIT) AS es_vendible,
+                   dl.fecha_vencimiento,
+                   dl.cantidad_inicial,
+                   ISNULL(vt.unidades, 0) AS unidades_vendidas,
+                   dl.cantidad_inicial - ISNULL(vt.unidades, 0) AS unidades_disponibles,
+                   l.costo_unitario,
+                   m.precio_venta
+            FROM origen.detalle_lote dl
+            INNER JOIN dw.dim_lote l        ON l.id_detalle_lote = dl.id_detalle_lote
+            INNER JOIN origen.medicamento m ON m.id_medicamento = dl.id_medicamento
+            -- Mismo criterio de stock que la aplicacion: cantidad inicial - vendido en ventas NO anuladas
+            OUTER APPLY (SELECT SUM(dv.cantidad) AS unidades
+                         FROM origen.detalle_venta dv
+                         INNER JOIN origen.venta v ON v.id_venta = dv.id_venta
+                         WHERE dv.id_detalle_lote = dl.id_detalle_lote AND v.estado <> 'Anulada') vt
+        ) x
+    ) AS s
+    ON d.fecha_key = @fecha_key AND d.lote_key = s.lote_key
+    WHEN MATCHED AND EXISTS (
+            SELECT s.medicamento_key, s.estado_lote, s.es_vendible, s.cantidad_inicial, s.unidades_vendidas,
+                   s.unidades_disponibles, s.costo_unitario, s.precio_venta, s.dias_para_vencer, s.estado_caducidad
+            EXCEPT
+            SELECT d.medicamento_key, d.estado_lote, d.es_vendible, d.cantidad_inicial, d.unidades_vendidas,
+                   d.unidades_disponibles, d.costo_unitario, d.precio_venta, d.dias_para_vencer, d.estado_caducidad)
+        THEN UPDATE SET medicamento_key = s.medicamento_key, id_carga = @id_carga, estado_lote = s.estado_lote,
+                        es_vendible = s.es_vendible, cantidad_inicial = s.cantidad_inicial,
+                        unidades_vendidas = s.unidades_vendidas, unidades_disponibles = s.unidades_disponibles,
+                        costo_unitario = s.costo_unitario, precio_venta = s.precio_venta,
+                        valor_costo = s.valor_costo, valor_venta = s.valor_venta,
+                        dias_para_vencer = s.dias_para_vencer, estado_caducidad = s.estado_caducidad,
+                        valor_en_riesgo = s.valor_en_riesgo, fecha_actualizacion = SYSDATETIME()
+    WHEN NOT MATCHED BY TARGET
+        THEN INSERT (fecha_key, lote_key, medicamento_key, id_carga, estado_lote, es_vendible, cantidad_inicial,
+                     unidades_vendidas, unidades_disponibles, costo_unitario, precio_venta, valor_costo, valor_venta,
+                     dias_para_vencer, estado_caducidad, valor_en_riesgo)
+             VALUES (@fecha_key, s.lote_key, s.medicamento_key, @id_carga, s.estado_lote, s.es_vendible, s.cantidad_inicial,
+                     s.unidades_vendidas, s.unidades_disponibles, s.costo_unitario, s.precio_venta, s.valor_costo, s.valor_venta,
+                     s.dias_para_vencer, s.estado_caducidad, s.valor_en_riesgo)
+    OUTPUT $action INTO @acciones;
+
+    SELECT @insertados   = ISNULL(SUM(IIF(accion = N'INSERT', 1, 0)), 0),
+           @actualizados = ISNULL(SUM(IIF(accion = N'UPDATE', 1, 0)), 0)
+    FROM @acciones;
+
+    -- Todo lote del origen debe tener su foto del dia
+    IF EXISTS (SELECT 1 FROM origen.detalle_lote dl
+               INNER JOIN dw.dim_lote l ON l.id_detalle_lote = dl.id_detalle_lote
+               WHERE NOT EXISTS (SELECT 1 FROM dw.fact_inventario f WHERE f.fecha_key = @fecha_key AND f.lote_key = l.lote_key))
+       OR (SELECT COUNT(*) FROM origen.detalle_lote) <> (SELECT COUNT(*) FROM dw.dim_lote)
+        THROW 50304, 'Hay lotes que no se pudieron cargar en dim_lote o fact_inventario.', 1;
+END
+GO
+
 /* --------------------------- Orquestador --------------------------- */
 CREATE OR ALTER PROCEDURE etl.sp_ejecutar_etl
 AS
@@ -257,6 +389,8 @@ BEGIN
     DECLARE @id_carga INT,
             @fechas INT, @med_ins INT, @med_act INT, @cli_ins INT, @cli_act INT,
             @met_ins INT, @hec_ins INT, @hec_act INT,
+            @lot_ins INT, @lot_act INT, @inv_ins INT, @inv_act INT,
+            @hoy DATE = CAST(GETDATE() AS DATE),
             @desde DATE, @hasta DATE;
 
     -- La bitacora se escribe fuera de la transaccion para conservar el registro aunque falle la carga
@@ -266,9 +400,9 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
-        -- Calendario: anos completos que cubren todas las ventas (o el ano actual si no hay)
-        SELECT @desde = DATEFROMPARTS(YEAR(ISNULL(MIN(fecha_venta), GETDATE())), 1, 1),
-               @hasta = DATEFROMPARTS(YEAR(ISNULL(MAX(fecha_venta), GETDATE())), 12, 31)
+        -- Calendario: anos completos que cubren todas las ventas y el dia de hoy (foto de inventario)
+        SELECT @desde = DATEFROMPARTS(YEAR(IIF(MIN(fecha_venta) < @hoy, MIN(fecha_venta), @hoy)), 1, 1),
+               @hasta = DATEFROMPARTS(YEAR(IIF(MAX(fecha_venta) > @hoy, MAX(fecha_venta), @hoy)), 12, 31)
         FROM origen.venta;
 
         EXEC etl.sp_cargar_dim_fecha @desde, @hasta, @fechas OUTPUT;
@@ -276,6 +410,8 @@ BEGIN
         EXEC etl.sp_cargar_dim_cliente @cli_ins OUTPUT, @cli_act OUTPUT;
         EXEC etl.sp_cargar_dim_metodo_pago @met_ins OUTPUT;
         EXEC etl.sp_cargar_fact_ventas @hec_ins OUTPUT, @hec_act OUTPUT;
+        EXEC etl.sp_cargar_dim_lote @lot_ins OUTPUT, @lot_act OUTPUT;
+        EXEC etl.sp_cargar_fact_inventario @hoy, @id_carga, @inv_ins OUTPUT, @inv_act OUTPUT;
 
         COMMIT TRANSACTION;
 
@@ -283,7 +419,9 @@ BEGIN
            SET fin = SYSDATETIME(), estado = N'Correcto',
                fechas_insertadas = @fechas, medicamentos_insertados = @med_ins, medicamentos_actualizados = @med_act,
                clientes_insertados = @cli_ins, clientes_actualizados = @cli_act, metodos_insertados = @met_ins,
-               hechos_insertados = @hec_ins, hechos_actualizados = @hec_act
+               hechos_insertados = @hec_ins, hechos_actualizados = @hec_act,
+               lotes_insertados = @lot_ins, lotes_actualizados = @lot_act,
+               inventario_insertados = @inv_ins, inventario_actualizados = @inv_act
          WHERE id_carga = @id_carga;
     END TRY
     BEGIN CATCH
