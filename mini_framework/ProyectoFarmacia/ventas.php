@@ -43,10 +43,12 @@ if ($accion === 'anular') {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') { http_response_code(405); exit('Método no permitido.'); }
     $id = filter_var($_GET['id'] ?? '', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
     if (!$id) fallo('Venta no válida.');
-    $s = $pdo->prepare("UPDATE dbo.venta SET estado='Anulada' WHERE id_venta=? AND estado<>'Anulada'");
-    $s->execute([$id]);
-    if (!$s->rowCount()) fallo('La venta no existe o ya estaba anulada.', 409);
-    auditar('venta', $id, 'ANULAR');
+    // Anulación + auditoría en una transacción: procedimiento dbo.sp_anular_venta.
+    try {
+        ejecutar_proc('EXEC dbo.sp_anular_venta @id_venta=?, @id_usuario=?', [$id, usuario_actual()['id']]);
+    } catch (PDOException $e) {
+        fallo_sql($e, 'No se pudo anular la venta.');
+    }
     hx_eventos(['crudGuardado' => ['texto' => 'Venta anulada'], 'aviso' => ['texto' => 'Venta N.º ' . $id . ' anulada. El stock fue devuelto al inventario.']]);
     exit;
 }

@@ -38,10 +38,11 @@ $__grupo = function ($titulo, $clavesActivas, array $items) use ($__act) {
             $__item('clientes.php', 'Clientes', 'clientes'),
             $__item('recetas.php', 'Recetas', 'recetas'),
             $__item('proveedores.php', 'Proveedores', 'proveedores', ROLES_GESTION)]) ?>
-      <?= $__grupo('Administración', ['usuarios', 'auditoria', 'reportes'], [
+      <?= $__grupo('Administración', ['usuarios', 'auditoria', 'reportes', 'mantenimiento'], [
             $__item('reportes.php', 'Reportes', 'reportes', ROLES_ADMIN),
             $__item('usuarios.php', 'Usuarios', 'usuarios', ROLES_ADMIN),
-            $__item('auditoria.php', 'Auditoría', 'auditoria', ROLES_ADMIN)]) ?>
+            $__item('auditoria.php', 'Auditoría', 'auditoria', ROLES_ADMIN),
+            $__item('mantenimiento.php', 'Mantenimiento (Data Warehouse y respaldos)', 'mantenimiento', ROLES_ADMIN)]) ?>
     </div>
     <div class="navbar-end">
       <?php if ($__u): ?>

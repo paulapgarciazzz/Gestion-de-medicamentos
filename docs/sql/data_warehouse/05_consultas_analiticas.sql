@@ -101,4 +101,49 @@ INNER JOIN dw.dim_fecha f ON f.fecha_key = h.fecha_key
 WHERE h.es_anulada = 1
 GROUP BY f.anio_mes
 ORDER BY f.anio_mes;
+
+/* ----------------------------- Inventario y caducidad -----------------------------
+   Se usa la ultima foto (el dia mas reciente cargado en fact_inventario). */
+DECLARE @ultima INT = (SELECT MAX(fecha_key) FROM dw.fact_inventario);
+
+-- 9. Valor del inventario vendible por categoria (ultima foto)
+SELECT m.categoria,
+       SUM(i.unidades_disponibles) AS unidades,
+       SUM(i.valor_costo)          AS valor_costo,
+       SUM(i.valor_venta)          AS valor_venta,
+       SUM(i.valor_venta) - SUM(i.valor_costo) AS utilidad_potencial
+FROM dw.fact_inventario i
+INNER JOIN dw.dim_medicamento m ON m.medicamento_key = i.medicamento_key
+WHERE i.fecha_key = @ultima AND i.es_vendible = 1
+GROUP BY m.categoria
+ORDER BY valor_costo DESC;
+
+-- 10. Caducidad: lotes vencidos o por vencer (90 dias) con unidades, y el dinero en riesgo
+SELECT i.estado_caducidad, m.descripcion_completa AS medicamento, l.numero_lote,
+       l.fecha_vencimiento, i.dias_para_vencer, i.unidades_disponibles, i.valor_en_riesgo
+FROM dw.fact_inventario i
+INNER JOIN dw.dim_lote l        ON l.lote_key = i.lote_key
+INNER JOIN dw.dim_medicamento m ON m.medicamento_key = i.medicamento_key
+WHERE i.fecha_key = @ultima AND i.estado_caducidad <> N'Vigente' AND i.unidades_disponibles > 0
+ORDER BY i.dias_para_vencer;
+
+-- 11. Resumen de caducidad (ultima foto)
+SELECT i.estado_caducidad,
+       COUNT(*)                    AS lotes,
+       SUM(i.unidades_disponibles) AS unidades,
+       SUM(i.valor_costo)          AS valor_costo,
+       SUM(i.valor_en_riesgo)      AS valor_en_riesgo
+FROM dw.fact_inventario i
+WHERE i.fecha_key = @ultima AND i.unidades_disponibles > 0
+GROUP BY i.estado_caducidad
+ORDER BY CASE i.estado_caducidad WHEN N'Vencido' THEN 1 WHEN N'Por vencer' THEN 2 ELSE 3 END;
+
+-- 12. Evolucion del stock vendible por dia (una fila por foto)
+SELECT f.fecha, SUM(i.unidades_disponibles) AS unidades, SUM(i.valor_costo) AS valor_costo,
+       SUM(i.valor_en_riesgo) AS valor_en_riesgo
+FROM dw.fact_inventario i
+INNER JOIN dw.dim_fecha f ON f.fecha_key = i.fecha_key
+WHERE i.es_vendible = 1
+GROUP BY f.fecha
+ORDER BY f.fecha;
 GO

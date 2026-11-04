@@ -136,6 +136,39 @@ function auditar($tabla, $idRegistro, $accion) {
     }
 }
 
+/* ------------------------------ Procedimientos almacenados ------------------------------
+ * Los procedimientos (docs/sql/procedimientos_negocio.sql y respaldos) avisan los errores de
+ * negocio con THROW 51000-51999: su mensaje se muestra tal cual. Cualquier otro error se registra
+ * en el log de Apache y el usuario ve $generico.
+ */
+/* Ejecuta un procedimiento y recorre TODOS sus resultados hasta el final. Algunas sentencias
+ * (BACKUP, por ejemplo) envían mensajes informativos que llegan como resultados sin columnas;
+ * si PHP deja de leer antes de terminar, SQL Server cancela el resto del procedimiento.
+ * Devuelve la primera fila del último resultado que tenga columnas (o null). */
+function ejecutar_proc($sql, $params = []) {
+    global $pdo;
+    $s = $pdo->prepare($sql);
+    $s->execute($params);
+    $fila = null;
+    do {
+        if ($s->columnCount() > 0) {
+            $filas = $s->fetchAll();
+            if ($filas) $fila = $filas[0];
+        }
+    } while ($s->nextRowset());
+    return $fila;
+}
+function fallo_sql(PDOException $e, $generico, $status = 500) {
+    $n = (int)($e->errorInfo[1] ?? 0);
+    if ($n >= 51000 && $n <= 51999) {
+        fallo(trim(preg_replace('/^(\[[^\]]*\])+/', '', (string)($e->errorInfo[2] ?? ''))));
+    }
+    error_log($e->getMessage());
+    if ($n === 2812) fallo('Falta instalar un procedimiento almacenado. Ejecute los scripts de docs/sql (vea LEEME.md).', 500);
+    if ($n === 229 || $n === 297 || $n === 262) fallo('La cuenta de la aplicación no tiene permiso en SQL Server. Ejecute docs/sql/permisos_aplicacion.sql.', 500);
+    fallo($generico, $status);
+}
+
 /* ------------------------------ Respuestas HTMX ------------------------------ */
 function hx_eventos(array $eventos) { header('HX-Trigger: ' . json_encode($eventos)); }
 function respuesta_ok($texto) {

@@ -149,5 +149,79 @@ CREATE TABLE etl.log_carga (
 );
 GO
 
+/* ----------------------------- Inventario y caducidad -----------------------------
+   dw.dim_lote: un lote de un medicamento (farmacia.dbo.detalle_lote).
+   dw.fact_inventario: FOTO DIARIA del inventario (snapshot).
+     Grano: UNA FILA POR LOTE POR DIA en que se ejecuta el ETL. Si el ETL se
+     ejecuta varias veces el mismo dia, la foto de ese dia se actualiza (no se
+     duplica); al dia siguiente se toma una foto nueva y la anterior queda como
+     historia, asi se puede ver como cambia el stock en el tiempo.
+     Incluye la caducidad: dias para vencer, estado (Vigente / Por vencer /
+     Vencido) y el valor al costo de las unidades en riesgo.
+
+        dim_fecha   dim_lote
+              \      /
+          fact_inventario --- dim_medicamento
+   ------------------------------------------------------------------------------- */
+
+IF OBJECT_ID(N'dw.dim_lote', N'U') IS NULL
+CREATE TABLE dw.dim_lote (
+    lote_key            INT IDENTITY(1,1) NOT NULL,
+    id_detalle_lote     INT           NOT NULL,   -- clave en farmacia
+    numero_lote         NVARCHAR(50)  NOT NULL,
+    medicamento_key     INT           NOT NULL,
+    fecha_fabricacion   DATE          NOT NULL,
+    fecha_vencimiento   DATE          NOT NULL,
+    estado              NVARCHAR(30)  NOT NULL,
+    costo_unitario      DECIMAL(12,2) NOT NULL,   -- promedio ponderado de sus compras
+    fecha_actualizacion DATETIME2(0)  NOT NULL CONSTRAINT DF_dim_lote_fecha DEFAULT SYSDATETIME(),
+    CONSTRAINT PK_dim_lote PRIMARY KEY (lote_key),
+    CONSTRAINT UQ_dim_lote_id UNIQUE (id_detalle_lote),
+    CONSTRAINT FK_dim_lote_medicamento FOREIGN KEY (medicamento_key) REFERENCES dw.dim_medicamento (medicamento_key)
+);
+GO
+
+IF OBJECT_ID(N'dw.fact_inventario', N'U') IS NULL
+CREATE TABLE dw.fact_inventario (
+    inventario_key       BIGINT IDENTITY(1,1) NOT NULL,
+    fecha_key            INT           NOT NULL,   -- dia de la foto
+    lote_key             INT           NOT NULL,
+    medicamento_key      INT           NOT NULL,
+    id_carga             INT           NOT NULL,   -- carga del ETL que tomo o actualizo la foto
+    estado_lote          NVARCHAR(30)  NOT NULL,
+    es_vendible          BIT           NOT NULL,   -- lote activo y no vencido
+    -- Medidas de inventario
+    cantidad_inicial     INT           NOT NULL,
+    unidades_vendidas    INT           NOT NULL,   -- sin contar ventas anuladas
+    unidades_disponibles INT           NOT NULL,
+    costo_unitario       DECIMAL(12,2) NOT NULL,
+    precio_venta         DECIMAL(12,2) NOT NULL,
+    valor_costo          DECIMAL(14,2) NOT NULL,   -- disponibles x costo
+    valor_venta          DECIMAL(14,2) NOT NULL,   -- disponibles x precio de venta
+    -- Medidas de caducidad
+    dias_para_vencer     INT           NOT NULL,   -- negativo si ya vencio
+    estado_caducidad     NVARCHAR(20)  NOT NULL,   -- Vigente / Por vencer (90 dias) / Vencido
+    valor_en_riesgo      DECIMAL(14,2) NOT NULL,   -- valor al costo de las unidades vencidas o por vencer
+    fecha_carga          DATETIME2(0)  NOT NULL CONSTRAINT DF_fact_inventario_carga DEFAULT SYSDATETIME(),
+    fecha_actualizacion  DATETIME2(0)  NULL,
+    CONSTRAINT PK_fact_inventario PRIMARY KEY (inventario_key),
+    CONSTRAINT UQ_fact_inventario_foto UNIQUE (fecha_key, lote_key),
+    CONSTRAINT FK_fact_inventario_fecha       FOREIGN KEY (fecha_key)       REFERENCES dw.dim_fecha (fecha_key),
+    CONSTRAINT FK_fact_inventario_lote        FOREIGN KEY (lote_key)        REFERENCES dw.dim_lote (lote_key),
+    CONSTRAINT FK_fact_inventario_medicamento FOREIGN KEY (medicamento_key) REFERENCES dw.dim_medicamento (medicamento_key),
+    CONSTRAINT CK_fact_inventario_caducidad   CHECK (estado_caducidad IN (N'Vigente', N'Por vencer', N'Vencido'))
+);
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_fact_inventario_medicamento' AND object_id = OBJECT_ID(N'dw.fact_inventario'))
+    CREATE INDEX IX_fact_inventario_medicamento ON dw.fact_inventario (medicamento_key, fecha_key) INCLUDE (unidades_disponibles, valor_costo);
+GO
+
+/* Columnas de la bitacora para lotes e inventario (si la tabla ya existia) */
+IF COL_LENGTH(N'etl.log_carga', N'lotes_insertados') IS NULL
+    ALTER TABLE etl.log_carga ADD lotes_insertados INT NULL, lotes_actualizados INT NULL,
+                                  inventario_insertados INT NULL, inventario_actualizados INT NULL;
+GO
+
 PRINT 'Tablas del Data Warehouse listas.';
 GO

@@ -60,6 +60,7 @@ $modulos = [
     ['clientes.php', 'Clientes', 'Datos de clientes', ROLES], ['recetas.php', 'Recetas', 'Recetas médicas', ROLES],
     ['proveedores.php', 'Proveedores', 'Empresas proveedoras', ROLES_GESTION], ['reportes.php', 'Reportes', 'Ventas, compras y utilidad', ROLES_ADMIN],
     ['usuarios.php', 'Usuarios', 'Accesos y roles', ROLES_ADMIN], ['auditoria.php', 'Auditoría', 'Quién hizo qué', ROLES_ADMIN],
+    ['mantenimiento.php', 'Mantenimiento', 'Data Warehouse y respaldos', ROLES_ADMIN],
 ];
 foreach ($modulos as [$url, $t, $d, $roles]) {
     if (!tiene_rol($roles)) continue;

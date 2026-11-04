@@ -101,22 +101,74 @@ SELECT N'Top 10 del DW = Top 10 del procedimiento con cursor',
 FROM (SELECT COUNT(*) AS n FROM (SELECT id_medicamento, unidades, monto FROM #top_cursor EXCEPT SELECT * FROM dw_top) x) a,
      (SELECT COUNT(*) AS n FROM (SELECT * FROM dw_top EXCEPT SELECT id_medicamento, unidades, monto FROM #top_cursor) x) b;
 
-/* 6. Volver a ejecutar el ETL no duplica ni cambia nada */
+/* 6. Lotes: una fila de dim_lote por cada detalle_lote del origen */
+INSERT INTO @r (comprobacion, resultado, detalle)
+SELECT N'Lotes: origen = dimension',
+       IIF(o.n = d.n, N'OK', N'ERROR'), CONCAT(N'origen ', o.n, N' | DW ', d.n)
+FROM (SELECT COUNT(*) AS n FROM origen.detalle_lote) o, (SELECT COUNT(*) AS n FROM dw.dim_lote) d;
+
+/* 7. Foto de inventario de hoy: unidades disponibles por lote iguales al stock real de farmacia */
+DECLARE @hoy DATE = CAST(GETDATE() AS DATE);
+DECLARE @hoy_key INT = YEAR(@hoy) * 10000 + MONTH(@hoy) * 100 + DAY(@hoy);
+WITH o AS (
+    SELECT dl.id_detalle_lote,
+           dl.cantidad_inicial - ISNULL((SELECT SUM(dv.cantidad) FROM origen.detalle_venta dv
+                                         INNER JOIN origen.venta v ON v.id_venta = dv.id_venta
+                                         WHERE dv.id_detalle_lote = dl.id_detalle_lote AND v.estado <> 'Anulada'), 0) AS disponibles
+    FROM origen.detalle_lote dl
+), d AS (
+    SELECT l.id_detalle_lote, f.unidades_disponibles AS disponibles
+    FROM dw.fact_inventario f INNER JOIN dw.dim_lote l ON l.lote_key = f.lote_key
+    WHERE f.fecha_key = @hoy_key
+)
+INSERT INTO @r (comprobacion, resultado, detalle)
+SELECT N'Inventario de hoy: disponibles por lote = stock de farmacia',
+       IIF(a.n + b.n = 0, N'OK', N'ERROR'), CONCAT(a.n, N' lotes solo/distintos en origen | ', b.n, N' solo/distintos en DW')
+FROM (SELECT COUNT(*) AS n FROM (SELECT * FROM o EXCEPT SELECT * FROM d) x) a,
+     (SELECT COUNT(*) AS n FROM (SELECT * FROM d EXCEPT SELECT * FROM o) x) b;
+
+/* 8. Stock vendible por medicamento (lotes activos y no vencidos), como la pantalla Existencias */
+WITH o AS (
+    SELECT dl.id_medicamento, SUM(dl.cantidad_inicial - ISNULL(vt.unidades, 0)) AS stock
+    FROM origen.detalle_lote dl
+    OUTER APPLY (SELECT SUM(dv.cantidad) AS unidades FROM origen.detalle_venta dv
+                 INNER JOIN origen.venta v ON v.id_venta = dv.id_venta
+                 WHERE dv.id_detalle_lote = dl.id_detalle_lote AND v.estado <> 'Anulada') vt
+    WHERE UPPER(LTRIM(RTRIM(dl.estado))) IN ('ACTIVO', 'DISPONIBLE', 'POR VENCER') AND dl.fecha_vencimiento >= @hoy
+    GROUP BY dl.id_medicamento
+), d AS (
+    SELECT m.id_medicamento, SUM(f.unidades_disponibles) AS stock
+    FROM dw.fact_inventario f INNER JOIN dw.dim_medicamento m ON m.medicamento_key = f.medicamento_key
+    WHERE f.fecha_key = @hoy_key AND f.es_vendible = 1
+    GROUP BY m.id_medicamento
+)
+INSERT INTO @r (comprobacion, resultado, detalle)
+SELECT N'Stock vendible por medicamento: origen = DW',
+       IIF(a.n + b.n = 0, N'OK', N'ERROR'), CONCAT(a.n + b.n, N' diferencias')
+FROM (SELECT COUNT(*) AS n FROM (SELECT * FROM o EXCEPT SELECT * FROM d) x) a,
+     (SELECT COUNT(*) AS n FROM (SELECT * FROM d EXCEPT SELECT * FROM o) x) b;
+
+/* 9. Volver a ejecutar el ETL no duplica ni cambia nada */
 DECLARE @antes INT = (SELECT COUNT(*) FROM dw.fact_ventas);
+DECLARE @antes_inv INT = (SELECT COUNT(*) FROM dw.fact_inventario);
 DECLARE @log TABLE (id_carga INT, inicio DATETIME2(0), fin DATETIME2(0), estado NVARCHAR(20), fechas_insertadas INT,
                     medicamentos_insertados INT, medicamentos_actualizados INT, clientes_insertados INT,
                     clientes_actualizados INT, metodos_insertados INT, hechos_insertados INT,
-                    hechos_actualizados INT, mensaje NVARCHAR(4000));
+                    hechos_actualizados INT, mensaje NVARCHAR(4000),
+                    lotes_insertados INT, lotes_actualizados INT, inventario_insertados INT, inventario_actualizados INT);
 INSERT INTO @log EXEC etl.sp_ejecutar_etl;
 DECLARE @despues INT = (SELECT COUNT(*) FROM dw.fact_ventas);
+DECLARE @despues_inv INT = (SELECT COUNT(*) FROM dw.fact_inventario);
 
 INSERT INTO @r (comprobacion, resultado, detalle)
 SELECT N'Segunda ejecucion del ETL: sin duplicados ni cambios',
-       IIF(@antes = @despues AND l.hechos_insertados = 0 AND l.hechos_actualizados = 0
+       IIF(@antes = @despues AND @antes_inv = @despues_inv AND l.hechos_insertados = 0 AND l.hechos_actualizados = 0
            AND l.medicamentos_insertados + l.medicamentos_actualizados + l.clientes_insertados
-             + l.clientes_actualizados + l.metodos_insertados + l.fechas_insertadas = 0, N'OK', N'ERROR'),
-       CONCAT(N'hechos antes ', @antes, N' | despues ', @despues, N' | insertados ', l.hechos_insertados,
-              N' | actualizados ', l.hechos_actualizados)
+             + l.clientes_actualizados + l.metodos_insertados + l.fechas_insertadas
+             + l.lotes_insertados + l.lotes_actualizados + l.inventario_insertados + l.inventario_actualizados = 0, N'OK', N'ERROR'),
+       CONCAT(N'ventas antes ', @antes, N' | despues ', @despues, N' | inventario antes ', @antes_inv,
+              N' | despues ', @despues_inv, N' | insertados ', l.hechos_insertados + l.inventario_insertados,
+              N' | actualizados ', l.hechos_actualizados + l.inventario_actualizados)
 FROM @log l;
 
 SELECT n, comprobacion, resultado, detalle FROM @r ORDER BY n;

@@ -4,6 +4,7 @@
  * Reglas: solo se venden lotes ACTIVOS y NO vencidos, con existencias; los medicamentos que
  * requieren receta exigen una receta vigente del mismo cliente; todo se recalcula en el servidor.
  * Totales: detalle.subtotal = cant × precio; detalle.total = (subtotal − descuento) + IVA.
+ * La venta la registra el procedimiento almacenado dbo.sp_registrar_venta (con transacción).
  */
 require_once __DIR__ . '/lib.php';
 requerir_login();
@@ -254,7 +255,6 @@ function venta_pagina() {
 }
 
 function venta_guardar() {
-    global $pdo;
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') { http_response_code(405); exit('Método no permitido.'); }
     $token = (string)($_POST['token'] ?? '');
     if ($token === '' || !hash_equals((string)($_SESSION['venta_token'] ?? ''), $token)) fallo('Esta venta ya fue registrada o la página expiró. Recargue la página para iniciar una nueva venta.', 409);
@@ -269,65 +269,19 @@ function venta_guardar() {
     if (!in_array($metodo, METODOS_PAGO, true)) fallo('Seleccione el método de pago.');
     $entrada = $_POST['lineas'] ?? [];
     if (!is_array($entrada) || !$entrada) fallo('Agregue al menos un medicamento a la venta.');
-    if (count($entrada) > 60) fallo('Demasiadas líneas en una sola venta.');
     $lineas = [];
     foreach ($entrada as $l) {
-        $lote = (int)($l['lote'] ?? 0);
-        $cant = (int)($l['cant'] ?? 0);
-        if ($lote < 1 || $cant < 1) fallo('Hay una línea con datos no válidos.');
-        $lineas[$lote]['cant'] = ($lineas[$lote]['cant'] ?? 0) + $cant;
-        $lineas[$lote]['desc'] = ($lineas[$lote]['desc'] ?? 0) + round(max(0, (float)($l['desc'] ?? 0)), 2);
+        $lineas[] = ['lote' => (int)($l['lote'] ?? 0), 'cant' => (int)($l['cant'] ?? 0), 'desc' => round(max(0, (float)($l['desc'] ?? 0)), 2)];
     }
+    // Validaciones, stock con bloqueo, receta, totales, inserciones y auditoría: todo dentro de una
+    // transacción en el procedimiento dbo.sp_registrar_venta (docs/sql/procedimientos_negocio.sql).
     try {
-        $pdo->beginTransaction();
-        $hoy = date('Y-m-d');
-        $sub = $dsc = $imp = 0.0;
-        $detalles = [];
-        $medsRx = [];
-        foreach ($lineas as $lote => $l) {
-            // UPDLOCK: bloquea el lote para que dos ventas simultáneas no vendan las mismas unidades.
-            $d = fila('SELECT dl.estado, dl.fecha_vencimiento, m.id_medicamento, m.nombre, m.precio_venta, m.iva_porcentaje, m.requiere_receta
-                FROM dbo.detalle_lote dl WITH (UPDLOCK, ROWLOCK) INNER JOIN dbo.medicamento m ON m.id_medicamento=dl.id_medicamento WHERE dl.id_detalle_lote=?', [$lote]);
-            if (!$d) throw new ErrorNegocio('Uno de los lotes de la venta ya no existe.');
-            if (!lote_estado_vendible($d['estado'])) throw new ErrorNegocio("El lote de «{$d['nombre']}» no está activo.");
-            if (substr((string)$d['fecha_vencimiento'], 0, 10) < $hoy) throw new ErrorNegocio("El lote de «{$d['nombre']}» está vencido.");
-            $stock = stock_lote($lote);
-            if ($l['cant'] > $stock) throw new ErrorNegocio("Stock insuficiente de «{$d['nombre']}» (disponible: $stock).");
-            $precio = (float)$d['precio_venta'];
-            $bruto = round($l['cant'] * $precio, 2);
-            if ($l['desc'] > $bruto) throw new ErrorNegocio("El descuento de «{$d['nombre']}» supera el valor de la línea.");
-            $neto = $bruto - $l['desc'];
-            $iva = round($neto * (float)$d['iva_porcentaje'] / 100, 2);
-            $sub += $bruto; $dsc += $l['desc']; $imp += $iva;
-            if ($d['requiere_receta']) $medsRx[] = (int)$d['id_medicamento'];
-            $detalles[] = [$lote, $l['cant'], $precio, $l['desc'], $bruto, round($neto + $iva, 2)];
-        }
-        if ($medsRx || $idReceta) {
-            if (!$idReceta) throw new ErrorNegocio('La venta incluye medicamentos que requieren receta: seleccione la receta del cliente.');
-            $r = fila('SELECT id_medicamento FROM dbo.receta WHERE id_receta=? AND id_cliente=? AND fecha_vencimiento>=CAST(? AS DATE) AND fecha_emision<=CAST(? AS DATE)', [$idReceta, $idCliente, $hoy, $hoy]);
-            if (!$r) throw new ErrorNegocio('La receta no pertenece a este cliente o no está vigente.');
-            foreach ($medsRx as $m) {
-                if ($m !== (int)$r['id_medicamento']) throw new ErrorNegocio('La receta seleccionada solo cubre el medicamento indicado en ella. Registre los demás medicamentos con receta en otra venta.');
-            }
-        }
-        $sub = round($sub, 2); $dsc = round($dsc, 2); $imp = round($imp, 2);
-        $total = round($sub - $dsc + $imp, 2);
-        $s = $pdo->prepare("INSERT INTO dbo.venta (id_cliente,id_receta,subtotal,impuesto,descuento,total,metodo_pago,estado) OUTPUT INSERTED.id_venta VALUES (?,?,?,?,?,?,?,'Completada')");
-        $s->execute([$idCliente, $idReceta, $sub, $imp, $dsc, $total, $metodo]);
-        $idVenta = (int)$s->fetchColumn();
-        $ins = $pdo->prepare('INSERT INTO dbo.detalle_venta (id_venta,id_detalle_lote,cantidad,precio_unidad,descuento,subtotal,total) VALUES (?,?,?,?,?,?,?)');
-        foreach ($detalles as $d) $ins->execute(array_merge([$idVenta], $d));
-        $pdo->commit();
-        auditar('venta', $idVenta, 'CREAR');
-        unset($_SESSION['venta_token']);
-        header('HX-Redirect: venta_ver.php?id=' . $idVenta);
-        echo '<div class="notification is-success">Venta registrada. Abriendo la factura…</div>';
-    } catch (ErrorNegocio $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
-        fallo($e->getMessage());
+        $idVenta = (int)(ejecutar_proc('EXEC dbo.sp_registrar_venta @id_usuario=?, @id_cliente=?, @id_receta=?, @metodo_pago=?, @lineas=?',
+            [usuario_actual()['id'], $idCliente, $idReceta, $metodo, json_encode($lineas)])['id_venta'] ?? 0);
     } catch (PDOException $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
-        error_log($e->getMessage());
-        fallo('No se pudo registrar la venta. Intente de nuevo.', 500);
+        fallo_sql($e, 'No se pudo registrar la venta. Intente de nuevo.');
     }
+    unset($_SESSION['venta_token']);
+    header('HX-Redirect: venta_ver.php?id=' . $idVenta);
+    echo '<div class="notification is-success">Venta registrada. Abriendo la factura…</div>';
 }

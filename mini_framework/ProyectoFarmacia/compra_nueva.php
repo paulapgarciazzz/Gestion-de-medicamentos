@@ -4,6 +4,7 @@
  * Cada línea de compra registra el lote que llega (número, fabricación, vencimiento, cantidad) y esas
  * unidades pasan a estar disponibles para la venta. Si el mismo medicamento llega con un número de lote
  * que ya existe (y la misma fecha de vencimiento), se suman las unidades a ese lote.
+ * La compra la registra el procedimiento almacenado dbo.sp_registrar_compra (con transacción).
  */
 require_once __DIR__ . '/lib.php';
 requerir_login(ROLES_GESTION);
@@ -154,7 +155,6 @@ function compra_pagina() {
 }
 
 function compra_guardar() {
-    global $pdo;
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') { http_response_code(405); exit('Método no permitido.'); }
     $token = (string)($_POST['token'] ?? '');
     if ($token === '' || !hash_equals((string)($_SESSION['compra_token'] ?? ''), $token)) fallo('Esta compra ya fue registrada o la página expiró. Recargue la página.', 409);
@@ -168,71 +168,21 @@ function compra_guardar() {
     $entrada = $_POST['lineas'] ?? [];
     if (!is_array($entrada) || !$entrada) fallo('Agregue al menos un medicamento a la compra.');
     if (count($entrada) > 60) fallo('Demasiadas líneas en una sola compra.');
-    $actualizarCosto = isset($_POST['actualizar_costo']);
-    try {
-        $pdo->beginTransaction();
-        if ((int)escalar('SELECT COUNT(*) FROM dbo.compra WHERE id_proveedor=? AND numero_factura=?', [$idProv, $factura])) {
-            throw new ErrorNegocio('Ya existe una compra registrada con esa factura para este proveedor.');
-        }
-        $lineas = [];
-        $sub = $imp = 0.0;
-        foreach ($entrada as $n => $l) {
-            $pos = $n + 1;
-            $med = fila('SELECT id_medicamento, nombre, iva_porcentaje FROM dbo.medicamento WHERE id_medicamento=?', [(int)($l['med'] ?? 0)]);
-            if (!$med) throw new ErrorNegocio("Línea $pos: el medicamento no existe.");
-            $lote = trim((string)($l['lote'] ?? ''));
-            $fab = (string)($l['fab'] ?? '');
-            $venc = (string)($l['venc'] ?? '');
-            $cant = (int)($l['cant'] ?? 0);
-            $costo = round((float)($l['costo'] ?? 0), 2);
-            if ($lote === '' || mb_strlen($lote) > 50) throw new ErrorNegocio("Línea $pos ({$med['nombre']}): indique el número de lote (máx. 50 caracteres).");
-            if (!fecha_valida($fab) || !fecha_valida($venc)) throw new ErrorNegocio("Línea $pos ({$med['nombre']}): fechas de fabricación y vencimiento no válidas.");
-            if ($fab > $hoy) throw new ErrorNegocio("Línea $pos ({$med['nombre']}): la fecha de fabricación no puede ser futura.");
-            if ($venc <= $hoy) throw new ErrorNegocio("Línea $pos ({$med['nombre']}): el lote ya está vencido; no se puede ingresar al inventario.");
-            if ($venc <= $fab) throw new ErrorNegocio("Línea $pos ({$med['nombre']}): el vencimiento debe ser posterior a la fabricación.");
-            if ($cant < 1) throw new ErrorNegocio("Línea $pos ({$med['nombre']}): la cantidad debe ser al menos 1.");
-            if ($costo < 0) throw new ErrorNegocio("Línea $pos ({$med['nombre']}): costo no válido.");
-            $bruto = round($cant * $costo, 2);
-            $iva = round($bruto * (float)$med['iva_porcentaje'] / 100, 2);
-            $sub += $bruto; $imp += $iva;
-            $lineas[] = [(int)$med['id_medicamento'], $lote, $fab, $venc, $cant, $costo, $bruto, round($bruto + $iva, 2)];
-        }
-        $sub = round($sub, 2); $imp = round($imp, 2);
-        $s = $pdo->prepare('INSERT INTO dbo.compra (id_proveedor,id_usuario,fecha_compra,numero_factura,total,impuesto) OUTPUT INSERTED.id_compra VALUES (?,?,CONVERT(DATETIME,?,120),?,?,?)');
-        $s->execute([$idProv, usuario_actual()['id'], $fecha . ' ' . date('H:i:s'), $factura, round($sub + $imp, 2), $imp]);
-        $idCompra = (int)$s->fetchColumn();
-        foreach ($lineas as [$idMed, $lote, $fab, $venc, $cant, $costo, $bruto, $totalLinea]) {
-            $ex = fila('SELECT id_detalle_lote, id_lote, fecha_fabricacion, fecha_vencimiento FROM dbo.detalle_lote WITH (UPDLOCK) WHERE id_medicamento=? AND numero_lote=?', [$idMed, $lote]);
-            if ($ex) {
-                if (substr((string)$ex['fecha_fabricacion'], 0, 10) !== $fab || substr((string)$ex['fecha_vencimiento'], 0, 10) !== $venc) {
-                    throw new ErrorNegocio("El lote «$lote» ya existe para ese medicamento con fechas de fabricación o vencimiento diferentes. Verifique las fechas antes de registrar la compra.");
-                }
-                $pdo->prepare('UPDATE dbo.detalle_lote SET cantidad_inicial=cantidad_inicial+? WHERE id_detalle_lote=?')->execute([$cant, $ex['id_detalle_lote']]);
-                $pdo->prepare('UPDATE dbo.lote SET cantidad_inicial=cantidad_inicial+? WHERE id_lote=?')->execute([$cant, $ex['id_lote']]);
-                $idDL = (int)$ex['id_detalle_lote'];
-            } else {
-                $s = $pdo->prepare("INSERT INTO dbo.lote (numero_lote,fecha_fabricacion,fecha_vencimiento,cantidad_inicial,estado) OUTPUT INSERTED.id_lote VALUES (?,?,?,?,'Activo')");
-                $s->execute([$lote, $fab, $venc, $cant]);
-                $idLote = (int)$s->fetchColumn();
-                $s = $pdo->prepare("INSERT INTO dbo.detalle_lote (id_medicamento,id_lote,numero_lote,fecha_fabricacion,fecha_vencimiento,cantidad_inicial,estado) OUTPUT INSERTED.id_detalle_lote VALUES (?,?,?,?,?,?,'Activo')");
-                $s->execute([$idMed, $idLote, $lote, $fab, $venc, $cant]);
-                $idDL = (int)$s->fetchColumn();
-            }
-            $pdo->prepare('INSERT INTO dbo.detalle_compra (id_compra,id_medicamento,id_detalle_lote,cantidad,costo_unidad,subtotal,total) VALUES (?,?,?,?,?,?,?)')
-                ->execute([$idCompra, $idMed, $idDL, $cant, $costo, $bruto, $totalLinea]);
-            if ($actualizarCosto) $pdo->prepare('UPDATE dbo.medicamento SET precio_costo=? WHERE id_medicamento=?')->execute([$costo, $idMed]);
-        }
-        $pdo->commit();
-        auditar('compra', $idCompra, 'CREAR');
-        unset($_SESSION['compra_token']);
-        header('HX-Redirect: compra_ver.php?id=' . $idCompra);
-        echo '<div class="notification is-success">Compra registrada. Abriendo el detalle…</div>';
-    } catch (ErrorNegocio $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
-        fallo($e->getMessage());
-    } catch (PDOException $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
-        error_log($e->getMessage());
-        fallo('No se pudo registrar la compra. Verifique los datos e intente de nuevo.', 500);
+    $lineas = [];
+    foreach ($entrada as $l) {
+        if (!is_array($l)) fallo('Hay una línea con datos no válidos.');
+        $lineas[] = ['med' => (int)($l['med'] ?? 0), 'lote' => trim((string)($l['lote'] ?? '')), 'fab' => (string)($l['fab'] ?? ''),
+                     'venc' => (string)($l['venc'] ?? ''), 'cant' => (string)($l['cant'] ?? ''), 'costo' => (string)($l['costo'] ?? '')];
     }
+    // Validación de cada línea, factura repetida, lotes, detalle, costo y auditoría: todo dentro de una
+    // transacción en el procedimiento dbo.sp_registrar_compra (docs/sql/procedimientos_negocio.sql).
+    try {
+        $idCompra = (int)(ejecutar_proc('EXEC dbo.sp_registrar_compra @id_usuario=?, @id_proveedor=?, @numero_factura=?, @fecha_compra=?, @actualizar_costo=?, @lineas=?',
+            [usuario_actual()['id'], $idProv, $factura, $fecha, isset($_POST['actualizar_costo']) ? 1 : 0, json_encode($lineas, JSON_UNESCAPED_UNICODE)])['id_compra'] ?? 0);
+    } catch (PDOException $e) {
+        fallo_sql($e, 'No se pudo registrar la compra. Verifique los datos e intente de nuevo.');
+    }
+    unset($_SESSION['compra_token']);
+    header('HX-Redirect: compra_ver.php?id=' . $idCompra);
+    echo '<div class="notification is-success">Compra registrada. Abriendo el detalle…</div>';
 }
