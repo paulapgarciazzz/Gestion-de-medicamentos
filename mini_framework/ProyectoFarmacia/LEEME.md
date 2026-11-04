@@ -46,3 +46,4 @@ El archivo `.env` contiene configuración privada: no lo suba a GitHub ni lo env
 - Requiere PHP 7.4 o superior con `pdo_sqlsrv`.
 - Las compras no se pueden editar ni borrar (por trazabilidad de lotes y stock); las ventas se anulan, no se borran.
 - Los montos usan ₡ y el formato 1.234,56 igual que su pantalla de medicamentos.
+- **Reportes**: la tarjeta «10 medicamentos más vendidos» de `reportes.php` usa el procedimiento con cursor `dbo.sp_reporte_ventas_medicamento`. Instálelo con `docs/sql/sp_reporte_ventas_medicamento.sql`; si falta, la tarjeta muestra un aviso.

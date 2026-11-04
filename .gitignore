@@ -5,3 +5,10 @@
 
 # Dependencias instaladas
 /vendor/
+
+# Respaldos de SQL Server (se guardan fuera del repositorio; nunca se suben)
+*.bak
+*.trn
+
+# Datos de prueba de uso local
+docs/sql/datos_prueba_farmacia.sql
