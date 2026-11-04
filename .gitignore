@@ -5,3 +5,7 @@
 
 # Dependencias instaladas
 /vendor/
+
+# Respaldos de SQL Server (se guardan fuera del repositorio; nunca se suben)
+*.bak
+*.trn
