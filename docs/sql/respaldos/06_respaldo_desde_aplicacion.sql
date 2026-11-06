@@ -81,13 +81,17 @@ BEGIN
     -- Crear la carpeta requiere sysadmin; normalmente ya existe (la crean los scripts 01-03)
     BEGIN TRY EXEC master.dbo.xp_create_subdir @carpeta; END TRY BEGIN CATCH END CATCH;
 
+    -- COMPRESSION no existe en SQL Server Express (EngineEdition = 4): solo se usa si la edición la admite
+    DECLARE @sql NVARCHAR(MAX) =
+          CASE @tipo WHEN 'Log' THEN N'BACKUP LOG farmacia' ELSE N'BACKUP DATABASE farmacia' END
+        + N' TO DISK = @archivo WITH '
+        + CASE @tipo WHEN 'Diferencial' THEN N'DIFFERENTIAL, ' ELSE N'' END
+        + N'INIT, CHECKSUM'
+        + CASE WHEN CAST(SERVERPROPERTY('EngineEdition') AS INT) <> 4 THEN N', COMPRESSION' ELSE N'' END
+        + N', NAME = @nombre;';
+
     BEGIN TRY
-        IF @tipo = 'Completo'
-            BACKUP DATABASE farmacia TO DISK = @archivo WITH INIT, CHECKSUM, COMPRESSION, NAME = @nombre;
-        ELSE IF @tipo = 'Diferencial'
-            BACKUP DATABASE farmacia TO DISK = @archivo WITH DIFFERENTIAL, INIT, CHECKSUM, COMPRESSION, NAME = @nombre;
-        ELSE
-            BACKUP LOG farmacia TO DISK = @archivo WITH INIT, CHECKSUM, COMPRESSION, NAME = @nombre;
+        EXEC sys.sp_executesql @sql, N'@archivo NVARCHAR(500), @nombre NVARCHAR(128)', @archivo, @nombre;
 
         -- Verificación del archivo (requiere permiso CREATE DATABASE; si no lo hay, el respaldo igual
         -- quedó protegido por CHECKSUM y se puede verificar luego con 04_verificar_backups.sql)

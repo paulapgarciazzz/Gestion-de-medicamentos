@@ -8,7 +8,7 @@
       <p id="texto-confirmacion"></p>
     </section>
     <footer class="modal-card-foot">
-      <button type="button" class="button" data-cancelar>Cancelar</button>
+      <button type="button" class="button is-light" data-cancelar>Cancelar</button>
       <button type="button" id="aceptar-eliminacion" class="button is-danger">Aceptar</button>
     </footer>
   </div>

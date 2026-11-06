@@ -51,6 +51,13 @@
 .tag.is-neutro { background: #e8eef7; color: var(--azul); }
 .barra-valor { height: 10px; background: var(--amarillo); border-radius: 5px; min-width: 2px; }
 .col-num { text-align: right !important; white-space: nowrap; }
+
+/* Historial de respaldos (Mantenimiento): columnas compactas y alineadas en la columna angosta. */
+.tabla-respaldos td { vertical-align: top; font-size: .9rem; }
+.tabla-respaldos td.fecha { white-space: nowrap; }
+.tabla-respaldos td small { display: block; margin-top: .2rem; font-size: .78rem; color: #60718a; }
+.tabla-respaldos td small.has-text-danger { white-space: normal; }
+.tabla-respaldos td:last-child { white-space: normal; }
 .filtros-lista { background: #fff; border: 1px solid #d5dfed; border-radius: 12px; padding: 1rem; margin-bottom: 1rem; }
 
 /* Resultados de la búsqueda de cliente (Nueva venta) y de proveedor (Nueva compra). */

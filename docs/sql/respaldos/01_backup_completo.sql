@@ -4,7 +4,8 @@
      el servicio de SQL Server ya tiene permisos sobre esa ruta)
    - Nombre:  farmacia_FULL_aaaaMMdd_HHmmss.bak (un archivo nuevo en cada ejecucion,
      no sobrescribe respaldos anteriores)
-   - Opciones: CHECKSUM (detecta paginas danadas) y COMPRESSION
+   - Opciones: CHECKSUM (detecta paginas danadas) y COMPRESSION (solo si la
+     edicion la admite; SQL Server Express no)
    - Al terminar comprueba el archivo con RESTORE VERIFYONLY
    - Es un backup normal (no COPY_ONLY): inicia la cadena de respaldos que
      usan el diferencial y el de log.
@@ -27,9 +28,12 @@ BEGIN TRY
 
     EXEC master.dbo.xp_create_subdir @carpeta;  -- crea la carpeta si no existe
 
-    BACKUP DATABASE @base
-        TO DISK = @archivo
-        WITH INIT, CHECKSUM, COMPRESSION, NAME = @nombre, STATS = 25;
+    -- COMPRESSION no existe en SQL Server Express (EngineEdition = 4): solo se usa si la edicion la admite
+    DECLARE @sql NVARCHAR(MAX) = N'BACKUP DATABASE ' + QUOTENAME(@base)
+        + N' TO DISK = @archivo WITH INIT, CHECKSUM'
+        + CASE WHEN CAST(SERVERPROPERTY('EngineEdition') AS INT) <> 4 THEN N', COMPRESSION' ELSE N'' END
+        + N', NAME = @nombre, STATS = 25;';
+    EXEC sys.sp_executesql @sql, N'@archivo NVARCHAR(500), @nombre NVARCHAR(128)', @archivo, @nombre;
 
     RESTORE VERIFYONLY FROM DISK = @archivo WITH CHECKSUM;
 
