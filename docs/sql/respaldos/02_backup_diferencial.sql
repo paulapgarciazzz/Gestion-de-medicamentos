@@ -25,9 +25,12 @@ BEGIN TRY
 
     EXEC master.dbo.xp_create_subdir @carpeta;
 
-    BACKUP DATABASE @base
-        TO DISK = @archivo
-        WITH DIFFERENTIAL, INIT, CHECKSUM, COMPRESSION, NAME = @nombre, STATS = 25;
+    -- COMPRESSION no existe en SQL Server Express (EngineEdition = 4): solo se usa si la edicion la admite
+    DECLARE @sql NVARCHAR(MAX) = N'BACKUP DATABASE ' + QUOTENAME(@base)
+        + N' TO DISK = @archivo WITH DIFFERENTIAL, INIT, CHECKSUM'
+        + CASE WHEN CAST(SERVERPROPERTY('EngineEdition') AS INT) <> 4 THEN N', COMPRESSION' ELSE N'' END
+        + N', NAME = @nombre, STATS = 25;';
+    EXEC sys.sp_executesql @sql, N'@archivo NVARCHAR(500), @nombre NVARCHAR(128)', @archivo, @nombre;
 
     RESTORE VERIFYONLY FROM DISK = @archivo WITH CHECKSUM;
 

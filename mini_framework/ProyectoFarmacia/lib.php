@@ -268,5 +268,5 @@ function modal_inicio($titulo, $postUrl, $ancho = '850px') {
 }
 function modal_fin($textoGuardar = 'Guardar') {
     echo '</section><footer class="modal-card-foot"><button type="submit" class="button is-primary">' . h($textoGuardar) . '</button>'
-        . '<button type="button" class="button" onclick="' . CERRAR_MODAL . '">Cancelar</button></footer></form></div></div>';
+        . '<button type="button" class="button is-light" onclick="' . CERRAR_MODAL . '">Cancelar</button></footer></form></div></div>';
 }

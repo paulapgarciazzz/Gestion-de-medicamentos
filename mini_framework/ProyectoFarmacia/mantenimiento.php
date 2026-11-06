@@ -130,8 +130,7 @@ if ($accion === 'respaldo') {
     }
     $texto = 'Respaldo ' . strtolower($tipo) . ' creado correctamente.';
     hx_eventos(['respaldoCreado' => 1, 'aviso' => ['texto' => $texto]]);
-    echo '<div class="notification is-success">' . h($texto) . '<br><small>' . h($r['archivo'] ?? '') . '</small></div>';
-    exit;
+    exit;   // sin contenido: limpia #resultado-respaldo; el éxito se muestra solo con la notificación
 }
 
 if ($accion === 'historial') {
@@ -141,13 +140,14 @@ if ($accion === 'historial') {
         fallo_mantenimiento($e, 'docs/sql/respaldos/06_respaldo_desde_aplicacion.sql', 'No se pudo leer el historial de respaldos.');
     }
     ?>
-    <div class="table-container"><table class="table is-fullwidth is-narrow is-striped"><thead><tr><th>Fecha</th><th>Tipo</th><th>Estado</th><th>Usuario</th></tr></thead><tbody>
+    <div class="table-container"><table class="table is-fullwidth is-narrow is-striped tabla-respaldos"><thead><tr><th>Fecha</th><th>Tipo</th><th>Estado</th><th>Usuario</th></tr></thead><tbody>
     <?php if (!$rows): ?><tr><td colspan="4" class="has-text-centered">Aún no hay respaldos hechos desde la aplicación.</td></tr><?php endif; ?>
     <?php foreach ($rows as $r): $clase = ['Correcto' => 'is-vigente', 'Error' => 'is-vencido'][$r['estado']] ?? 'is-porvencer'; ?>
-        <tr><td><?= fecha_fmt($r['inicio'], true) ?><br><small class="has-text-grey"><?= duracion($r['inicio'], $r['fin']) ?></small></td><td><?= h($r['tipo']) ?></td>
+        <tr title="<?= h(basename(str_replace('\\', '/', (string)$r['archivo']))) ?>">
+        <td class="fecha"><?= fecha_fmt($r['inicio'], true) ?><small><?= duracion($r['inicio'], $r['fin']) ?></small></td>
+        <td><?= h($r['tipo']) ?></td>
         <td><span class="tag <?= $clase ?>"><?= h($r['estado']) ?></span>
-            <br><small title="<?= h($r['archivo']) ?>"><?= h(basename(str_replace('\\', '/', $r['archivo']))) ?></small>
-            <?= $r['estado'] === 'Error' ? '<br><small class="has-text-danger">' . h($r['mensaje']) . '</small>' : '' ?></td>
+            <?= $r['estado'] === 'Error' ? '<small class="has-text-danger">' . h($r['mensaje']) . '</small>' : '' ?></td>
         <td><?= h($r['usuario']) ?></td></tr>
     <?php endforeach; ?></tbody></table></div>
     <?php
