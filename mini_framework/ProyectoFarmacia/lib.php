@@ -245,7 +245,7 @@ function pagina_inicio($titulo, $activo = '') {
     echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
         . '<title>Farmacia | ' . h($titulo) . '</title>'
         . '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css">'
-        . '<link rel="stylesheet" href="estilos.css?v=20261031-4"><link rel="stylesheet" href="estilos_extra.css?v=20261031-4">'
+        . '<link rel="stylesheet" href="estilos.css?v=20261118-3"><link rel="stylesheet" href="estilos_extra.css?v=20261118-3">'
         . '<script src="htmx.min.js"></script></head><body>';
     include __DIR__ . '/menu.php';
     echo '<section class="section"><div class="container">';
@@ -253,7 +253,7 @@ function pagina_inicio($titulo, $activo = '') {
 function pagina_fin() {
     echo '</div></section><div id="modal-contenido"></div>';
     include __DIR__ . '/dialogos.php';
-    echo '<script src="avisos.js"></script><script src="app.js"></script></body></html>';
+    echo '<script src="avisos.js"></script><script src="app.js?v=20261118-3"></script></body></html>';
 }
 function encabezado($titulo, $subtitulo = '', $botones = '') {
     echo '<div class="level encabezado-productos no-imprimir"><div class="level-left"><div><h1 class="title">' . h($titulo) . '</h1>'
