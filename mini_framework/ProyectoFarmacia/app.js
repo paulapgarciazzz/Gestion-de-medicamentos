@@ -30,8 +30,16 @@
         }
     });
 
+    // Menú lateral en pantallas angostas: el botón ☰ lo abre; el fondo oscuro o Escape lo cierran.
+    function menuLateral(abrir) {
+        document.body.classList.toggle('sidebar-abierto', abrir);
+        document.querySelectorAll('[data-burger]').forEach((b) => b.setAttribute('aria-expanded', abrir ? 'true' : 'false'));
+    }
     document.querySelectorAll('[data-burger]').forEach((b) => b.addEventListener('click', () => {
-        b.classList.toggle('is-active');
-        document.getElementById('menu-principal').classList.toggle('is-active');
+        menuLateral(!document.body.classList.contains('sidebar-abierto'));
     }));
+    document.querySelectorAll('[data-cerrar-menu]').forEach((f) => f.addEventListener('click', () => menuLateral(false)));
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && document.body.classList.contains('sidebar-abierto')) menuLateral(false);
+    });
 })();
